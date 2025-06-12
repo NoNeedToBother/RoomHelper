@@ -12,6 +12,7 @@ import ru.kpfu.itis.paramonov.roomhelper.ui.components.EditPanel
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityBlock
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.MenuBar
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.RelationshipArrow
+import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
 import ru.kpfu.itis.paramonov.roomhelper.util.showErrorMessage
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -117,7 +118,16 @@ class RoomHelperWindow : DialogWrapper(true) {
     }
 
     private fun editPanel(): JComponent {
-        return EditPanel().apply {
+        return EditPanel(
+            onSave = { entity ->
+                /*val newState = ArrayList(history.currentState)
+                newState.find { it.name == entity.name }?.apply {
+                    when(this) {
+                        is Parsed.
+                    }
+                }*/
+            }
+        ).apply {
             editPanel = this
         }
     }
@@ -295,10 +305,10 @@ class RoomHelperWindow : DialogWrapper(true) {
     }
 
     private fun removeEntity(removed: Parsed) {
-        val newState = ArrayList(history.currentState)
+        val newState = ArrayList(history.currentState.map { it.deepCopy() })
         if (removed is Parsed.Embedded) {
-            newState.forEach {
-                it.fields.toMutableList().removeIf { field -> field.type == removed.name }
+            newState.forEach { entity ->
+                entity.fields = entity.fields.filter { field -> field.type != removed.name }
             }
         }
         if (removed is Parsed.Entity) {
@@ -308,16 +318,16 @@ class RoomHelperWindow : DialogWrapper(true) {
             }
             newState.forEach { entity ->
                 if (entity is Parsed.Entity) {
-                    entity.fields.toMutableList().removeIf { field ->
-                        entity.relations.any { relation ->
+                    entity.fields = entity.fields.toMutableList().filter { field ->
+                        entity.relations.none { relation ->
                             relation.refTable == removed.name &&
-                                    relation.refColumn == field.name
+                                    relation.name == field.name
                         }
                     }
                 }
             }
         }
-        newState.remove(removed)
+        newState.removeIf { it.name == removed.name }
         history.add(newState)
         entityBlocks.removeIf {
             it.entity == removed

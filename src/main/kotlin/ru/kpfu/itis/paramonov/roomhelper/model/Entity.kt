@@ -2,24 +2,24 @@ package ru.kpfu.itis.paramonov.roomhelper.model
 
 sealed class Parsed {
     abstract val name: String
-    abstract val fields: List<Field>
+    abstract var fields: List<Field>
 
     data class Entity(
         override val name: String,
-        override val fields: List<Field>,
-        val relations: List<Relation>,
-        val indices: List<List<String>> = emptyList(),
+        override var fields: List<Field>,
+        var relations: List<Relation>,
+        var indices: List<List<String>> = emptyList(),
     ) : Parsed()
 
     data class Embedded(
         override val name: String,
-        override val fields: List<Field>,
+        override var fields: List<Field>,
     ) : Parsed()
 
     data class ManyToMany(
         override val name: String,
-        override val fields: List<Field>,
-        val relations: List<ManyToManyRelation>,
+        override var fields: List<Field>,
+        var relations: List<ManyToManyRelation>,
     ) : Parsed()
 }
 

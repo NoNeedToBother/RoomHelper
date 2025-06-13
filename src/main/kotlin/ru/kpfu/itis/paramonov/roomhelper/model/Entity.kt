@@ -30,12 +30,12 @@ data class ManyToManyRelation(
 
 data class Field(
     val name: String,
-    val type: String,
-    val isPrimaryKey: Boolean = false,
-    val isPartOfCompositeKey: Boolean = false,
-    val isUnique: Boolean = false,
-    val isNotNull: Boolean = false,
-    val isEmbedded: Boolean = false,
+    var type: String,
+    var isPrimaryKey: Boolean = false,
+    var isPartOfCompositeKey: Boolean = false,
+    var isUnique: Boolean = false,
+    var isNotNull: Boolean = false,
+    var isEmbedded: Boolean = false,
 )
 
 data class Relation(

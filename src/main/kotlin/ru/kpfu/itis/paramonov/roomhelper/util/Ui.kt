@@ -3,6 +3,10 @@ package ru.kpfu.itis.paramonov.roomhelper.util
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.ui.Messages
+import javax.swing.JComponent
+import javax.swing.JTextField
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 fun showErrorMessage(e: Throwable) {
     Messages.showErrorDialog(
@@ -28,6 +32,35 @@ fun openFileChooser(
                 "Invalid File Format"
             )
             openFileChooser(onFileChosen)
+        }
+    }
+}
+
+fun JTextField.addTextChangedListener(onTextChange: (String) -> Unit) {
+    document.addDocumentListener(object : DocumentListener {
+        override fun insertUpdate(e: DocumentEvent?) {
+            onChange()
+        }
+
+        override fun removeUpdate(e: DocumentEvent?) {
+            onChange()
+        }
+
+        override fun changedUpdate(e: DocumentEvent?) {
+            onChange()
+        }
+
+        private fun onChange() {
+            onTextChange(text)
+        }
+    })
+}
+
+fun JComponent.recursiveDisable() {
+    components.forEach { component ->
+        component.isEnabled = false
+        if (component is JComponent) {
+            component.recursiveDisable()
         }
     }
 }

@@ -251,6 +251,8 @@ class RoomHelperWindow : DialogWrapper(true) {
                 },
                 onEditRequest = {
                     editPanel?.changeEntity(it.entity)
+                    editPanel?.revalidate()
+                    editPanel?.repaint()
                 },
                 onPositionChanged = {
                     pane.repaint()

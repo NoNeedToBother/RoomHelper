@@ -3,6 +3,7 @@ package ru.kpfu.itis.paramonov.roomhelper.ui.components
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.IconUtil
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -39,6 +40,8 @@ class EditPanel(
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
             add(JButton("Save").apply {
                 addActionListener {
+                    prevPanel?.let { remove(it) }
+                    prevPanel = null
                     editBuffer?.let { onSave(it) }
                 }
             })
@@ -64,41 +67,60 @@ class EditPanel(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             background = JBColor.background()
 
-            val fieldHeight = 50
-            entity.fields.forEach { field ->
-                val fieldPanel = JPanel(BorderLayout()).apply {
-                    preferredSize = Dimension(300, fieldHeight)
-                    maximumSize = Dimension(300, fieldHeight)
-                    background = JBColor.background()
-
-                    add(JButton(AllIcons.Actions.DeleteTag).apply {
-                        toolTipText = "Delete"
-                        border = BorderFactory.createEmptyBorder()
-                        background = JBColor.RED
-                        addActionListener {
-                            editBuffer?.fields?.toMutableList()?.remove(field)
-                        }
-                    })
-
-                    add(JLabel(field.name).apply {
-                        foreground = JBColor.foreground()
-                        border = BorderFactory.createEmptyBorder(0, 0, 0, 10)
-                    }, BorderLayout.WEST)
-
-                    val textField = JTextField(field.type).apply {
-                        toolTipText = "Edit field type"
-                    }
-                    add(textField, BorderLayout.CENTER)
-                }
-
-                add(fieldPanel)
-                add(Box.createVerticalStrut(5))
-            }
+            paintFields(
+                panel = this,
+                entity = entity
+            )
         }
 
         JBScrollPane(contentPanel).let {
             add(it, BorderLayout.CENTER)
             prevPanel = it
         }
+    }
+
+    private fun paintFields(panel: JPanel, entity: Parsed) {
+        entity.fields.forEach { field ->
+            val fieldPanel = JPanel(BorderLayout()).apply panel@ {
+                preferredSize = Dimension(200, FIELD_HEIGHT)
+                maximumSize = Dimension(400, FIELD_HEIGHT)
+                background = JBColor.background()
+
+                add(JPanel(BorderLayout()).apply westPanel@ {
+                    preferredSize = Dimension(100, FIELD_HEIGHT)
+                    maximumSize = Dimension(400 - FIELD_HEIGHT, FIELD_HEIGHT)
+
+                    add(JButton(
+                        IconUtil.colorize(AllIcons.Actions.DeleteTag, JBColor.RED)
+                    ).apply {
+                        preferredSize = Dimension(FIELD_HEIGHT, FIELD_HEIGHT)
+                        minimumSize = Dimension(FIELD_HEIGHT, FIELD_HEIGHT)
+                        toolTipText = "Delete"
+                        border = BorderFactory.createEmptyBorder()
+                        addActionListener {
+                            editBuffer?.fields = editBuffer?.fields?.filter { it.name != field.name } ?: listOf()
+                            this@panel.components.forEach { it.isEnabled = false }
+                            this@westPanel.components.forEach { it.isEnabled = false }
+                        }
+                    }, BorderLayout.WEST)
+
+                    add(JTextField(field.name).apply {
+                        toolTipText = "Edit field name"
+                        foreground = JBColor.foreground()
+                    }, BorderLayout.CENTER)
+                }, BorderLayout.WEST)
+
+                add(JTextField(field.type).apply {
+                    toolTipText = "Edit field type"
+                }, BorderLayout.EAST)
+            }
+
+            panel.add(fieldPanel)
+            panel.add(Box.createVerticalStrut(5))
+        }
+    }
+
+    companion object {
+        private const val FIELD_HEIGHT = 50
     }
 }

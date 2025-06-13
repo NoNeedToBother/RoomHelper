@@ -120,12 +120,11 @@ class RoomHelperWindow : DialogWrapper(true) {
     private fun editPanel(): JComponent {
         return EditPanel(
             onSave = { entity ->
-                /*val newState = ArrayList(history.currentState)
-                newState.find { it.name == entity.name }?.apply {
-                    when(this) {
-                        is Parsed.
-                    }
-                }*/
+                val newState = ArrayList(history.currentState)
+                newState.removeIf { it.name == entity.name }
+                newState.add(entity)
+                history.add(newState)
+                updateUIOnEdit()
             }
         ).apply {
             editPanel = this

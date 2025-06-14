@@ -19,14 +19,9 @@ sealed class Parsed {
     data class ManyToMany(
         override val name: String,
         override var fields: List<Field>,
-        var relations: List<ManyToManyRelation>,
+        var relations: List<Relation>,
     ) : Parsed()
 }
-
-data class ManyToManyRelation(
-    val refColumn: String,
-    val refTable: String,
-)
 
 data class Field(
     val name: String,
@@ -42,6 +37,6 @@ data class Relation(
     val name: String,
     val type: String,
     val fieldType: String,
-    val refTable: String?,
-    val refColumn: String?,
+    val refTable: String,
+    val refColumn: String,
 )

@@ -1,7 +1,6 @@
 package ru.kpfu.itis.paramonov.roomhelper.generator.util.database
 
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
-import ru.kpfu.itis.paramonov.roomhelper.model.ManyToManyRelation
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import kotlin.math.min
@@ -21,7 +20,9 @@ fun parseEntities(text: String): List<Parsed> {
             else -> lines.first().removeSuffix(":")
         }
 
-        val fieldsStart = lines.indexOfFirst { it == "fields:" } + 1
+        val fieldsStart = lines.indexOfFirst { it == "fields:" }.let {
+            if (it == -1) lines.size + 1 else it + 1
+        }
         val relationsStart = lines.indexOfFirst { it == "relations:" }.let {
             if (it == -1) lines.size + 1 else it + 1
         }
@@ -29,17 +30,15 @@ fun parseEntities(text: String): List<Parsed> {
             if (it == -1) lines.size + 1 else it + 1
         }
 
-        val manyToManyRelations = mutableListOf<ManyToManyRelation>()
-        val fields = lines
-            .subList(fieldsStart, min(indicesStart - 1, relationsStart - 1))
-            .filter { it.isNotBlank() }
-            .map {
-                if (isManyToMany) {
-                    manyToManyRelations.add(parseManyToManyEntityField(it))
+        val fields = if (fieldsStart < lines.size)
+            lines
+                .subList(fieldsStart, min(indicesStart - 1, relationsStart - 1))
+                .filter { it.isNotBlank() }
+                .map {
+                    parseField(it)
                 }
-                parseField(it)
-            }
-            .toMutableList()
+                .toMutableList()
+        else emptyList<Field>().toMutableList()
 
         val relations = if (!isEmbeddable && relationsStart < lines.size)
             lines
@@ -62,7 +61,7 @@ fun parseEntities(text: String): List<Parsed> {
             entities.add(Parsed.Embedded(name, fields))
         }
         else if (isManyToMany) {
-            entities.add(Parsed.ManyToMany(name, fields, manyToManyRelations))
+            entities.add(Parsed.ManyToMany(name, fields, relations))//manyToManyRelations))
         }
         else {
             entities.add(Parsed.Entity(name, fields, relations, indices))
@@ -86,26 +85,13 @@ fun parseField(line: String): Field {
     )
 }
 
-fun parseManyToManyEntityField(line: String): ManyToManyRelation {
-    val parts = line.split("\\s+".toRegex())
-
-    val refIndex = parts.indexOfFirst { it == "ref" } + 1
-    val relation = parts[refIndex].split(":")
-
-    return ManyToManyRelation(
-        refColumn = relation[1],
-        refTable = relation[0]
-    )
-}
-
 fun parseRelation(line: String): Relation {
     val parts = line.split("\\s+".toRegex())
-    val type = parts[2].removeSuffix(":")
 
     val refParts = parts[4].split(":")
     return Relation(
         name = parts[0],
-        type = type,
+        type = parts[2],
         fieldType = getFieldType(parts[1]),
         refTable = refParts[0],
         refColumn = refParts[1],

@@ -119,13 +119,25 @@ class RoomHelperWindow : DialogWrapper(true) {
 
     private fun editPanel(): JComponent {
         return EditPanel(
-            onSave = { entity ->
-                val newState = ArrayList(history.currentState)
-                newState.removeIf { it.name == entity.name }
-                newState.add(entity)
+            onSave = { updatedEntity, otherEntityRelationUpdates ->
+                val newState = history.currentState.map { it.deepCopy() }.toMutableList()
+                newState.removeIf { it.name == updatedEntity.name }
+                newState.add(updatedEntity)
+                otherEntityRelationUpdates.forEach { update ->
+                    newState.forEach { entity ->
+                        if (entity.name == update.first) {
+                            if (entity is Parsed.Entity) {
+                                entity.relations = update.second
+                            }
+                            if (entity is Parsed.ManyToMany) {
+                                entity.relations = update.second
+                            }
+                        }
+                    }
+                }
                 history.add(newState)
                 updateUIOnEdit()
-            }
+            },
         ).apply {
             editPanel = this
         }
@@ -250,7 +262,7 @@ class RoomHelperWindow : DialogWrapper(true) {
                     updateUIOnEdit()
                 },
                 onEditRequest = {
-                    editPanel?.changeEntity(it.entity)
+                    editPanel?.changeEntity(history.currentState, it.entity)
                     editPanel?.revalidate()
                     editPanel?.repaint()
                 },
@@ -276,7 +288,7 @@ class RoomHelperWindow : DialogWrapper(true) {
 
         history.currentState.filterIsInstance<Parsed.Entity>().forEach { entity ->
             entity.relations.forEach { relation ->
-                relation.refTable?.let { refTable ->
+                relation.refTable.let { refTable ->
                     val fromBlock = entityBlocks.find { it.entity.name == refTable } ?: return@let
                     val toBlock = entityBlocks.find { it.entity.name == entity.name } ?: return@let
 

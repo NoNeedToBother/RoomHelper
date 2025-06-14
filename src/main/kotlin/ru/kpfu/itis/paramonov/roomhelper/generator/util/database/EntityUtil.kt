@@ -2,6 +2,7 @@ package ru.kpfu.itis.paramonov.roomhelper.generator.util.database
 
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.util.lineSeparator
+import ru.kpfu.itis.paramonov.roomhelper.util.tab
 
 fun generateRoomEntity(entity: Parsed.Entity): String {
     val imports = mutableListOf(
@@ -25,35 +26,35 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
     val compositeKeyFields = entity.fields.filter { it.isPartOfCompositeKey }
 
     val foreignKeys = entity.relations
-        .filter { it.type == "m2o" && it.refTable != null }
+        .filter { it.type == "m2o" }
         .map { relation ->
             """ForeignKey(
-            |    entity = ${relation.refTable}::class,
-            |    parentColumns = ["${relation.refColumn}"],
-            |    childColumns = ["${relation.name}"],
-            |    onDelete = ForeignKey.CASCADE
+            |${tab}entity = ${relation.refTable}::class,
+            |${tab}parentColumns = ["${relation.refColumn}"],
+            |${tab}childColumns = ["${relation.name}"],
+            |${tab}onDelete = ForeignKey.CASCADE
             |)
             """.trimMargin()
         }
 
     val entityAnnotation = StringBuilder("""@Entity(
-        |${"""tableName = "${entity.name.lowercase()}"""".prependIndent("\t")},
+        |${"""tableName = "${entity.name.lowercase()}"""".prependIndent(tab)},
         |${if (foreignKeys.isNotEmpty())
         """foreignKeys = [
-                |${foreignKeys.joinToString().prependIndent("\t")}
-                |],""".trimMargin().prependIndent("\t") else ""
+                |${foreignKeys.joinToString().prependIndent(tab)}
+                |],""".trimMargin().prependIndent(tab) else ""
     }
         |${if (compositeKeyFields.isNotEmpty())
         """primaryKeys = [
-                |${compositeKeyFields.joinToString(", ") { "\"${it.name}\"" }.prependIndent("\t")}
-                |],""".trimMargin().prependIndent("\t") else ""
+                |${compositeKeyFields.joinToString(", ") { "\"${it.name}\"" }.prependIndent(tab)}
+                |],""".trimMargin().prependIndent(tab) else ""
     }
         |${if (uniqueIndices.isNotEmpty() || indices.isNotEmpty())
         """indices = [
-                |${uniqueIndices.joinToString(separator = ",$lineSeparator").prependIndent("\t")}
-                |${indices.joinToString(separator = ",$lineSeparator").prependIndent("\t")}
+                |${uniqueIndices.joinToString(separator = ",$lineSeparator").prependIndent(tab)}
+                |${indices.joinToString(separator = ",$lineSeparator").prependIndent(tab)}
                 |],
-            """.trimMargin().lines().filter { it.isNotBlank() }.joinToString("$lineSeparator").prependIndent("\t") else ""
+            """.trimMargin().lines().filter { it.isNotBlank() }.joinToString("$lineSeparator").prependIndent(tab) else ""
     }
         |)
         """.trimMargin())
@@ -86,7 +87,7 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
         |
         |${entityAnnotation.lines().filter { it.isNotBlank() }.joinToString("$lineSeparator") }
         |data class ${entity.name}(
-        |${fieldsCode.prependIndent("\t")}
+        |${fieldsCode.prependIndent(tab)}
         |)
         """.trimMargin()
 }
@@ -99,7 +100,7 @@ fun generateRoomEmbedded(entity: Parsed.Embedded): String {
 
     return """
         |data class ${entity.name}(
-        |${fieldsCode.prependIndent("\t")}
+        |${fieldsCode.prependIndent(tab)}
         |)
     """.trimMargin()
 }
@@ -115,7 +116,7 @@ fun generateManyToManyEntity(entity: Parsed.ManyToMany): String {
     return """
         |@Entity(primaryKeys = [$primaryKeys])
         |data class ${entity.name}(
-        |${fieldsCode.prependIndent("\t")}
+        |${fieldsCode.prependIndent(tab)}
         |)
     """.trimMargin()
 }

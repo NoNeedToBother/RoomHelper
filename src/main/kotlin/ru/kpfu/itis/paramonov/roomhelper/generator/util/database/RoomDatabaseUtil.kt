@@ -3,10 +3,11 @@ package ru.kpfu.itis.paramonov.roomhelper.generator.util.database
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.util.capitalize
 import ru.kpfu.itis.paramonov.roomhelper.util.lineSeparator
+import ru.kpfu.itis.paramonov.roomhelper.util.tab
 
 fun generateDatabase(entities: List<Parsed.Entity>, databaseName: String): String {
     val entityClasses = """entities = [
-        |${entities.joinToString(",$lineSeparator") { it.name.capitalize() + "::class" }.prependIndent("\t")}
+        |${entities.joinToString(",$lineSeparator") { it.name.capitalize() + "::class" }.prependIndent(tab)}
         |]
     """.trimIndent()
     val daoProperties = entities.joinToString("$lineSeparator") {
@@ -27,11 +28,11 @@ fun generateDatabase(entities: List<Parsed.Entity>, databaseName: String): Strin
         |${imports.lines().filter { it.isNotBlank() }.joinToString("$lineSeparator") }
         |
         |@Database(
-        |    ${entityClasses.prependIndent("\t")},
-        |    version = 1
+        |${tab}${entityClasses.prependIndent(tab)},
+        |${tab}version = 1
         |)${if (hasDateFields) "$lineSeparator@TypeConverters(DateConverter::class)" else ""}
         |abstract class ${databaseName.capitalize()} : RoomDatabase() {
-        |${daoProperties.prependIndent("\t")}
+        |${daoProperties.prependIndent(tab)}
         |}
     """.trimMargin()
 }

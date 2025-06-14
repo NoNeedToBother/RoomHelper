@@ -49,25 +49,20 @@ class FileGenerator {
         val fields = embedded.fields.joinToString("$lineSeparator\t\t\t") { generateFieldLine(it) }
         return """
             |entity embed ${embedded.name}:
-            |        fields:
-            |            $fields
+            |    fields:
+            |        $fields
         """.trimMargin()
     }
 
     private fun generateManyToManyBlock(m2m: Parsed.ManyToMany): String {
-        m2m.fields
-        val fields = m2m.fields.joinToString("$lineSeparator\t\t\t") { field ->
-            val refRelation = m2m.relations[m2m.fields.indexOf(field)]
-            val ref = " ref ${refRelation.refTable}:${refRelation.refColumn}"
-            "${field.name} ${getDatabaseType(field.type)}$ref" +
-                    if (field.isNotNull) " nnull" else "" +
-                    if (field.isUnique) " unique" else ""
+        val relations = m2m.relations.joinToString("$lineSeparator\t\t") { relation ->
+            generateRelationLine(relation)
         }
 
         return """
             |entity m2m ${m2m.name}:
-            |        fields:
-            |            $fields
+            |    relations:
+            |        $relations
         """.trimMargin()
     }
 
@@ -83,7 +78,7 @@ class FileGenerator {
     }
 
     private fun generateRelationLine(relation: Relation): String {
-        val refPart = relation.refTable?.let { " ref ${it}:${relation.refColumn}" } ?: ""
-        return "${relation.name} ${getDatabaseType(relation.fieldType)} ${relation.type}$refPart"
+        val ref = "ref ${relation.refTable}:${relation.refColumn}"
+        return "${relation.name} ${getDatabaseType(relation.fieldType)} ${relation.type} $ref"
     }
 }

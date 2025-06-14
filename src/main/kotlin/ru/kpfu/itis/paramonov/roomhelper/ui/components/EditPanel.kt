@@ -6,6 +6,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.IconUtil
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
+import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
 import ru.kpfu.itis.paramonov.roomhelper.util.recursiveDisable
 import java.awt.BorderLayout
@@ -20,10 +21,16 @@ import javax.swing.JLabel
 import javax.swing.JPanel
 
 class EditPanel(
-    onSave: (Parsed) -> Unit,
+    onSave: (
+        updatedEntity: Parsed,
+        otherEntityRelationUpdates: List<Pair<String, List<Relation>>>
+            ) -> Unit,
 ) : JPanel() {
 
     private var entity: Parsed? = null
+    private var entities: List<Parsed> = emptyList()
+
+    private var relationUpdates: MutableList<Pair<String, List<Relation>>> = mutableListOf()
 
     private var _editBuffer: Parsed? = null
     private val editBuffer: Parsed get() = _editBuffer
@@ -50,29 +57,19 @@ class EditPanel(
             add(JButton("Discard changes").apply {
                 addActionListener {
                     contentPane?.let { this@EditPanel.remove(it) }
-                    entity?.let { changeEntity(it) }
+                    entity?.let { changeEntity(entities, it) }
                     this@EditPanel.revalidate()
                     this@EditPanel.repaint()
                     newFieldIndex = 1
                 }
             })
             add(JButton("Cancel").apply {
-                addActionListener {
-                    contentPane?.let { this@EditPanel.remove(it) }
-                    this@EditPanel.revalidate()
-                    this@EditPanel.repaint()
-                    newFieldIndex = 1
-                    entity = null
-                    _editBuffer = null
-                }
+                addActionListener { endCurrentEditing() }
             })
             add(JButton("Save").apply {
                 addActionListener {
-                    contentPane?.let { this@EditPanel.remove(it) }
-                    this@EditPanel.revalidate()
-                    this@EditPanel.repaint()
-                    newFieldIndex = 1
-                    _editBuffer?.let { onSave(it.deepCopy()) }
+                    _editBuffer?.let { onSave(it.deepCopy(), relationUpdates) }
+                    endCurrentEditing()
                 }
             })
         }
@@ -80,8 +77,19 @@ class EditPanel(
         add(buttonPanel, BorderLayout.SOUTH)
     }
 
-    fun changeEntity(entity: Parsed) {
+    fun endCurrentEditing() {
+        contentPane?.let { this@EditPanel.remove(it) }
+        this@EditPanel.revalidate()
+        this@EditPanel.repaint()
+        newFieldIndex = 1
+        _editBuffer = null
+        entity = null
+        relationUpdates = mutableListOf()
+    }
+
+    fun changeEntity(entities: List<Parsed>, entity: Parsed) {
         this.entity = entity
+        this.entities = entities
         this._editBuffer = when(entity) {
             is Parsed.Entity -> entity.copy()
             is Parsed.Embedded -> entity.copy()
@@ -161,42 +169,6 @@ class EditPanel(
             }
     }
 
-    private fun updatePrimaryKeys(bufferName: String, isChecked: Boolean) {
-        val otherPrimaryKeyAmount = editBuffer.fields.filter {
-            (it.isPrimaryKey || it.isPartOfCompositeKey) && it.name != bufferName
-        }.size
-
-        if (isChecked) {
-            editBuffer.fields = editBuffer.fields.map {
-                if (it.name == bufferName) {
-                    it.copy(
-                        isPrimaryKey = otherPrimaryKeyAmount == 0,
-                        isPartOfCompositeKey = otherPrimaryKeyAmount > 0
-                    )
-                } else if (it.isPrimaryKey) {
-                    it.copy(
-                        isPrimaryKey = false,
-                        isPartOfCompositeKey = true
-                    )
-                } else it
-            }
-        } else {
-            editBuffer.fields = editBuffer.fields.map {
-                if (it.name == bufferName) {
-                    it.copy(
-                        isPrimaryKey = false,
-                        isPartOfCompositeKey = false
-                    )
-                } else if (it.isPrimaryKey || it.isPartOfCompositeKey) {
-                    it.copy(
-                        isPrimaryKey = otherPrimaryKeyAmount == 1,
-                        isPartOfCompositeKey = otherPrimaryKeyAmount > 1
-                    )
-                } else it
-            }
-        }
-    }
-
     private fun paintIndexes(panel: JPanel, entity: Parsed.Entity) {
         entity.indexes.forEach { index ->
             val indexPanel = JPanel(BorderLayout()).apply indexPanel@ {
@@ -245,6 +217,7 @@ class EditPanel(
                 panel.recursiveDisable()
             },
             onNameChanged = { name ->
+                updateOtherEntityRelations(name, bufferNameStore)
                 editBuffer.fields = editBuffer.fields.map {
                     if (bufferNameStore.bufferName == it.name) it.copy(name = name)
                     else it.copy()
@@ -286,6 +259,89 @@ class EditPanel(
                 }
             },
         )
+    }
+
+    private fun updateOtherEntityRelations(newName: String, bufferNameStore: BufferNameStore) {
+        // check that field name is not same as others to prevent editing relations with other matched field
+        if (editBuffer.fields.filter { it.name == bufferNameStore.bufferName }.size <= 1) {
+            entities.forEach { entity ->
+                // check whether relation update was already added to not edit entities
+                if (relationUpdates.none { it.first == entity.name }) {
+                    if (entity is Parsed.Entity) {
+                        if (entity.relations.find { it.refTable == editBuffer.name }?.refColumn ==
+                            bufferNameStore.bufferName) {
+
+                            addRelationUpdate(newName, entity.name, bufferNameStore, entity.relations)
+                        }
+                    }
+                    if (entity is Parsed.ManyToMany) {
+                        if (entity.relations.find { it.refTable == editBuffer.name }?.refColumn ==
+                            bufferNameStore.bufferName) {
+
+                            addRelationUpdate(newName, entity.name, bufferNameStore, entity.relations)
+                        }
+                    }
+                } else {
+                    relationUpdates = relationUpdates.map { update ->
+                        if (update.first == entity.name) {
+                            entity.name to update.second.map { relation ->
+                                if (relation.refTable == editBuffer.name) relation.copy(refColumn = newName)
+                                else relation
+                            }
+                        } else update
+                    }.toMutableList()
+                }
+            }
+        }
+    }
+
+    private fun addRelationUpdate(newName: String, entityName: String, bufferNameStore: BufferNameStore,
+                                  relations: List<Relation>) {
+        relationUpdates.add(entityName to
+                relations.map { relation ->
+                    if (relation.refTable == editBuffer.name &&
+                        relation.refColumn == bufferNameStore.bufferName)
+
+                        relation.copy(refColumn = newName)
+                    else relation
+                }
+        )
+    }
+
+    private fun updatePrimaryKeys(bufferName: String, isChecked: Boolean) {
+        val otherPrimaryKeyAmount = editBuffer.fields.filter {
+            (it.isPrimaryKey || it.isPartOfCompositeKey) && it.name != bufferName
+        }.size
+
+        if (isChecked) {
+            editBuffer.fields = editBuffer.fields.map {
+                if (it.name == bufferName) {
+                    it.copy(
+                        isPrimaryKey = otherPrimaryKeyAmount == 0,
+                        isPartOfCompositeKey = otherPrimaryKeyAmount > 0
+                    )
+                } else if (it.isPrimaryKey) {
+                    it.copy(
+                        isPrimaryKey = false,
+                        isPartOfCompositeKey = true
+                    )
+                } else it
+            }
+        } else {
+            editBuffer.fields = editBuffer.fields.map {
+                if (it.name == bufferName) {
+                    it.copy(
+                        isPrimaryKey = false,
+                        isPartOfCompositeKey = false
+                    )
+                } else if (it.isPrimaryKey || it.isPartOfCompositeKey) {
+                    it.copy(
+                        isPrimaryKey = otherPrimaryKeyAmount == 1,
+                        isPartOfCompositeKey = otherPrimaryKeyAmount > 1
+                    )
+                } else it
+            }
+        }
     }
 
     private data class BufferNameStore(var bufferName: String)

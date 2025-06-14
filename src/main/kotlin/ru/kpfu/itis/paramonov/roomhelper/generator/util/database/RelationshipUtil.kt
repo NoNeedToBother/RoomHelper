@@ -2,6 +2,7 @@ package ru.kpfu.itis.paramonov.roomhelper.generator.util.database
 
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.util.capitalize
+import ru.kpfu.itis.paramonov.roomhelper.util.tab
 
 fun generateOneToOneRelationshipClasses(entities: List<Parsed.Entity>): List<RelationshipClass> {
     val result = mutableListOf<RelationshipClass>()
@@ -15,12 +16,12 @@ fun generateOneToOneRelationshipClasses(entities: List<Parsed.Entity>): List<Rel
 
                 val code = """
                     |data class $className(
-                    |    @Embedded val ${parentEntity.name.lowercase()}: ${parentEntity.name},
-                    |    @Relation(
-                    |        parentColumn = "${relation.refColumn}",
-                    |        entityColumn = "${relation.name}"
-                    |    )
-                    |    val ${entity.name.lowercase()}: ${entity.name.capitalize()}
+                    |${tab}@Embedded val ${parentEntity.name.lowercase()}: ${parentEntity.name},
+                    |${tab}@Relation(
+                    |${tab}${tab}parentColumn = "${relation.refColumn}",
+                    |${tab}${tab}entityColumn = "${relation.name}"
+                    |${tab})
+                    |${tab}val ${entity.name.lowercase()}: ${entity.name.capitalize()}
                     |)
                 """.trimMargin()
 
@@ -43,12 +44,12 @@ fun generateManyToOneRelationshipClasses(entities: List<Parsed.Entity>): List<Re
 
                 val code = """
                     |data class $className(
-                    |    @Embedded val ${parentEntity.name.lowercase()}: ${parentEntity.name.capitalize()}
-                    |    @Relation(
-                    |        parentColumn = "${relation.refColumn}",
-                    |        entityColumn = "${relation.name}"
-                    |    )
-                    |    val ${entity.name.lowercase()}List: List<${entity.name.capitalize()}>
+                    |${tab}@Embedded val ${parentEntity.name.lowercase()}: ${parentEntity.name.capitalize()}
+                    |${tab}@Relation(
+                    |${tab}${tab}parentColumn = "${relation.refColumn}",
+                    |${tab}${tab}entityColumn = "${relation.name}"
+                    |${tab})
+                    |${tab}val ${entity.name.lowercase()}List: List<${entity.name.capitalize()}>
                     |)
                 """.trimMargin()
 
@@ -68,8 +69,8 @@ fun generateManyToManyRelationshipClasses(entities: List<Parsed.ManyToMany>): Li
                 childClass = m2mEntity.relations[1].refTable,
                 parentColumn = m2mEntity.relations[0].refColumn,
                 childColumn = m2mEntity.relations[1].refColumn,
-                entityParentColumn = m2mEntity.fields[0].name,
-                entityChildColumn = m2mEntity.fields[1].name,
+                entityParentColumn = m2mEntity.relations[0].name,
+                entityChildColumn = m2mEntity.relations[1].name,
             ),
             generateManyToManyRelationshipJunction(
                 entityName = m2mEntity.name,
@@ -77,8 +78,8 @@ fun generateManyToManyRelationshipClasses(entities: List<Parsed.ManyToMany>): Li
                 childClass = m2mEntity.relations[0].refTable,
                 parentColumn = m2mEntity.relations[1].refColumn,
                 childColumn = m2mEntity.relations[0].refColumn,
-                entityParentColumn = m2mEntity.fields[1].name,
-                entityChildColumn = m2mEntity.fields[0].name,
+                entityParentColumn = m2mEntity.relations[1].name,
+                entityChildColumn = m2mEntity.relations[0].name,
             )
         )
     }
@@ -95,16 +96,16 @@ private fun generateManyToManyRelationshipJunction(
 ): RelationshipClass {
     val code = """
         |data class ${parentClass}With${childClass}sJunction(
-        |    @Embedded
-        |    val ${parentClass.lowercase()}: $parentClass
+        |${tab}@Embedded
+        |${tab}val ${parentClass.lowercase()}: $parentClass
         |
-        |    @Relation(
-        |        parentColumn = "$parentColumn",
-        |        entityColumn = "$childColumn",
-        |        entity = ${childClass}::class,
-        |        associateBy = Junction(${entityName}::class, parentColumn = $entityParentColumn, childColumn = $entityChildColumn)
-        |    )
-        |    val ${childClass.lowercase()}List: List<${childClass}>
+        |${tab}@Relation(
+        |${tab}${tab}parentColumn = "$parentColumn",
+        |${tab}${tab}entityColumn = "$childColumn",
+        |${tab}${tab}entity = ${childClass}::class,
+        |${tab}${tab}associateBy = Junction(${entityName}::class, parentColumn = $entityParentColumn, childColumn = $entityChildColumn)
+        |${tab})
+        |${tab}val ${childClass.lowercase()}List: List<${childClass}>
         |)
     """.trimMargin()
     return RelationshipClass(code = code, fileName = "${parentClass}With${childClass}sJunction")

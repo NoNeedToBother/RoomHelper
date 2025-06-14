@@ -2,11 +2,10 @@ package ru.kpfu.itis.paramonov.roomhelper.ui.components
 
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
-import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.IconUtil
+import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
-import ru.kpfu.itis.paramonov.roomhelper.util.addTextChangedListener
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
 import ru.kpfu.itis.paramonov.roomhelper.util.recursiveDisable
 import java.awt.BorderLayout
@@ -19,11 +18,12 @@ import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.JTextField
 
 class EditPanel(
     onSave: (Parsed) -> Unit,
 ) : JPanel() {
+
+    private var entity: Parsed? = null
 
     private var _editBuffer: Parsed? = null
     private val editBuffer: Parsed get() = _editBuffer
@@ -31,7 +31,10 @@ class EditPanel(
 
     private var contentPane: JBScrollPane? = null
 
+    private var fieldPanel: JPanel? = null
     private var indexPanel: JPanel? = null
+
+    private var newFieldIndex = 1
 
     init {
         layout = BorderLayout()
@@ -39,16 +42,36 @@ class EditPanel(
         background = JBColor.background()
 
         add(JLabel("Edit entity").apply {
-            font = font.deriveFont(Font.BOLD, 16f)
+            font = font.deriveFont(Font.BOLD, 20f)
             border = BorderFactory.createEmptyBorder(0, 0, 10, 0)
         }, BorderLayout.NORTH)
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
+            add(JButton("Discard changes").apply {
+                addActionListener {
+                    contentPane?.let { this@EditPanel.remove(it) }
+                    entity?.let { changeEntity(it) }
+                    this@EditPanel.revalidate()
+                    this@EditPanel.repaint()
+                    newFieldIndex = 1
+                }
+            })
+            add(JButton("Cancel").apply {
+                addActionListener {
+                    contentPane?.let { this@EditPanel.remove(it) }
+                    this@EditPanel.revalidate()
+                    this@EditPanel.repaint()
+                    newFieldIndex = 1
+                    entity = null
+                    _editBuffer = null
+                }
+            })
             add(JButton("Save").apply {
                 addActionListener {
                     contentPane?.let { this@EditPanel.remove(it) }
                     this@EditPanel.revalidate()
                     this@EditPanel.repaint()
+                    newFieldIndex = 1
                     _editBuffer?.let { onSave(it.deepCopy()) }
                 }
             })
@@ -58,6 +81,7 @@ class EditPanel(
     }
 
     fun changeEntity(entity: Parsed) {
+        this.entity = entity
         this._editBuffer = when(entity) {
             is Parsed.Entity -> entity.copy()
             is Parsed.Embedded -> entity.copy()
@@ -72,10 +96,37 @@ class EditPanel(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             background = JBColor.background()
 
-            paintFields(panel = this, entity = entity)
+            add(JLabel("Edit fields").apply {
+                font = font.deriveFont(Font.BOLD, 16f)
+            })
+            add(JPanel().apply {
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                fieldPanel = this
+                paintFields(panel = this, entity = entity)
+            })
+            add(JPanel(FlowLayout(FlowLayout.LEFT)).apply {
+                add(JButton("Add new").apply {
+                    addActionListener {
+                        val newField = Field(name = "untitled$newFieldIndex", type = "")
+                        editBuffer.fields = editBuffer.fields.toMutableList().apply { add(newField) }
+                        newFieldIndex++
+
+                        val bufferNameStore = BufferNameStore(newField.name)
+                        val fieldPanel = fieldPanel(
+                            entity = entity, field = newField,
+                            bufferNameStore = bufferNameStore,
+                        )
+                        this@EditPanel.fieldPanel?.apply {
+                            add(fieldPanel)
+                            add(Box.createVerticalStrut(5))
+                            revalidate()
+                        }
+                    }
+                })
+            })
             if (entity is Parsed.Entity) {
                 add(JLabel("Edit indexes").apply {
-                    font = font.deriveFont(Font.BOLD, 12f)
+                    font = font.deriveFont(Font.BOLD, 16f)
                 })
                 add(JPanel().apply {
                     layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -92,9 +143,6 @@ class EditPanel(
     }
 
     private fun paintFields(panel: JPanel, entity: Parsed) {
-        panel.add(JLabel("Edit fields").apply {
-            font = font.deriveFont(Font.BOLD, 12f)
-        }, BorderLayout.NORTH)
         entity.fields
             .filter { field ->
                 if (entity is Parsed.Entity) {
@@ -102,106 +150,11 @@ class EditPanel(
                 } else true
             }
             .forEach { field ->
-                var bufferName = field.name
-                val fieldPanel = JPanel(BorderLayout()).apply panel@ {
-                    preferredSize = Dimension(EDIT_BLOCK_WIDTH, EDIT_BLOCK_HEIGHT)
-                    maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH, EDIT_BLOCK_HEIGHT)
-                    background = JBColor.background()
-
-                    add(JPanel(BorderLayout()).apply westPanel@ {
-                        preferredSize = Dimension(EDIT_BLOCK_WIDTH / 2, EDIT_BLOCK_HEIGHT)
-                        maximumSize = Dimension(
-                            EDIT_BLOCK_MAXIMUM_WIDTH / 2 - EDIT_BLOCK_HEIGHT,
-                            EDIT_BLOCK_HEIGHT
-                        )
-
-                        add(RemoveButton(EDIT_BLOCK_HEIGHT) {
-                            editBuffer.fields = editBuffer.fields.filter { it.name != bufferName }
-                            if (editBuffer is Parsed.Entity) {
-                                (editBuffer as Parsed.Entity).indexes =
-                                    (editBuffer as Parsed.Entity).indexes
-                                        .filter { index -> !index.contains(bufferName) }
-                                indexPanel?.let {
-                                    it.removeAll()
-                                    paintIndexes(it, editBuffer as Parsed.Entity)
-                                    it.revalidate()
-                                }
-                            }
-                        }, BorderLayout.WEST)
-
-                        add(JTextField(field.name).apply {
-                            toolTipText = "Edit field name"
-                            addTextChangedListener { name ->
-                                editBuffer.fields = editBuffer.fields.map {
-                                    if (bufferName == it.name) it.copy(name = name)
-                                    else it.copy()
-                                }
-                                if (editBuffer is Parsed.Entity) {
-                                    (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
-                                        .map { index ->
-                                            if (index.contains(bufferName)) index.map { indexPart ->
-                                                if (indexPart == bufferName) name else indexPart
-                                            } else index
-                                        }
-                                    indexPanel?.let {
-                                        it.removeAll()
-                                        paintIndexes(it, editBuffer as Parsed.Entity)
-                                        it.revalidate()
-                                    }
-                                }
-                                bufferName = name
-                            }
-                        }, BorderLayout.CENTER)
-                    }, BorderLayout.WEST)
-
-                    add(JPanel(BorderLayout()).apply {
-                        preferredSize = Dimension(EDIT_BLOCK_WIDTH / 2, EDIT_BLOCK_HEIGHT)
-                        maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH / 2, EDIT_BLOCK_HEIGHT)
-                        add(JTextField(field.type).apply {
-                            toolTipText = "Edit field type"
-                            addTextChangedListener { type ->
-                                editBuffer.fields = editBuffer.fields.map {
-                                    if (bufferName == it.name) it.copy(type = type)
-                                    else it.copy()
-                                }
-                            }
-                        }, BorderLayout.CENTER)
-                    }, BorderLayout.EAST)
-
-                    add(JPanel(FlowLayout(FlowLayout.LEFT, 5, 0)).apply {
-                        if (entity is Parsed.Entity) {
-                            add(JBCheckBox("PK").apply {
-                                isSelected = field.isPrimaryKey || field.isPartOfCompositeKey
-                                toolTipText = "Is primary key or part of one"
-                                addActionListener {
-                                    updatePrimaryKeys(bufferName, isSelected)
-                                }
-                            })
-
-                            add(JBCheckBox("Unique").apply {
-                                isSelected = field.isUnique
-                                toolTipText = "Is unique"
-                                addActionListener {
-                                    editBuffer.fields = editBuffer.fields.map {
-                                        if (it.name == bufferName) it.copy(isUnique = isSelected)
-                                        else it
-                                    }
-                                }
-                            })
-                        }
-
-                        add(JBCheckBox("Not null").apply {
-                            isSelected = field.isNotNull
-                            toolTipText = "Is not null"
-                            addActionListener {
-                                editBuffer.fields = editBuffer.fields.map {
-                                    if (it.name == bufferName) it.copy(isNotNull = isSelected)
-                                    else it
-                                }
-                            }
-                        })
-                    }, BorderLayout.SOUTH)
-                }
+                val bufferNameStore = BufferNameStore(field.name)
+                val fieldPanel = fieldPanel(
+                    entity = entity, field = field,
+                    bufferNameStore = bufferNameStore,
+                )
 
                 panel.add(fieldPanel)
                 panel.add(Box.createVerticalStrut(5))
@@ -267,6 +220,75 @@ class EditPanel(
             panel.add(Box.createVerticalStrut(5))
         }
     }
+
+    private fun fieldPanel(
+        entity: Parsed, field: Field,
+        bufferNameStore: BufferNameStore,
+    ): FieldPanel {
+        return FieldPanel(
+            fieldWidth = EDIT_BLOCK_WIDTH,
+            fieldHeight = EDIT_BLOCK_HEIGHT,
+            maximumWidth = EDIT_BLOCK_MAXIMUM_WIDTH,
+            entity = entity, field = field,
+            onRemoveClicked = { panel ->
+                editBuffer.fields = editBuffer.fields.filter { it.name != bufferNameStore.bufferName }
+                if (editBuffer is Parsed.Entity) {
+                    (editBuffer as Parsed.Entity).indexes =
+                        (editBuffer as Parsed.Entity).indexes
+                            .filter { index -> !index.contains(bufferNameStore.bufferName) }
+                    indexPanel?.let {
+                        it.removeAll()
+                        paintIndexes(it, editBuffer as Parsed.Entity)
+                        it.revalidate()
+                    }
+                }
+                panel.recursiveDisable()
+            },
+            onNameChanged = { name ->
+                editBuffer.fields = editBuffer.fields.map {
+                    if (bufferNameStore.bufferName == it.name) it.copy(name = name)
+                    else it.copy()
+                }
+                if (editBuffer is Parsed.Entity) {
+                    (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
+                        .map { index ->
+                            if (index.contains(bufferNameStore.bufferName)) index.map { indexPart ->
+                                if (indexPart == bufferNameStore.bufferName) name else indexPart
+                            } else index
+                        }
+                    indexPanel?.let {
+                        it.removeAll()
+                        paintIndexes(it, editBuffer as Parsed.Entity)
+                        it.revalidate()
+                    }
+                }
+                bufferNameStore.bufferName = name
+            },
+            onTypeChanged = { type ->
+                editBuffer.fields = editBuffer.fields.map {
+                    if (bufferNameStore.bufferName == it.name) it.copy(type = type)
+                    else it.copy()
+                }
+            },
+            onPrimaryKeyCheckBoxClicked = { checked ->
+                updatePrimaryKeys(bufferNameStore.bufferName, checked)
+            },
+            onUniqueCheckBoxClicked = { checked ->
+                editBuffer.fields = editBuffer.fields.map {
+                    if (it.name == bufferNameStore.bufferName) it.copy(isUnique = checked)
+                    else it
+                }
+            },
+            onNotNullCheckBoxClicked = { checked ->
+                editBuffer.fields = editBuffer.fields.map {
+                    if (it.name == bufferNameStore.bufferName) it.copy(isNotNull = checked)
+                    else it
+                }
+            },
+        )
+    }
+
+    private data class BufferNameStore(var bufferName: String)
 
     companion object {
         private const val EDIT_BLOCK_HEIGHT = 50

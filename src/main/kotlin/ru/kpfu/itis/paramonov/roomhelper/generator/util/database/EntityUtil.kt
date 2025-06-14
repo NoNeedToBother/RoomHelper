@@ -16,7 +16,7 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
         Index(value = ["${field.name}"], unique = true)
         """.trimIndent()
     }
-    val indices = entity.indices.map {
+    val indices = entity.indexes.map {
         """
         Index(value = ["${it.joinToString(", ")}"])
         """.trimIndent()
@@ -61,7 +61,7 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
     if (foreignKeys.isNotEmpty()) {
         imports.add("import androidx.room.ForeignKey")
     }
-    if (uniqueIndices.isNotEmpty() || entity.indices.isNotEmpty()) {
+    if (uniqueIndices.isNotEmpty() || entity.indexes.isNotEmpty()) {
         imports.add("import androidx.room.Index")
     }
     if (entity.fields.any { it.isEmbedded }) {

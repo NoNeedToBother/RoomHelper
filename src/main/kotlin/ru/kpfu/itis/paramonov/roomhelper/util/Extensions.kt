@@ -19,7 +19,7 @@ fun Parsed.Entity.deepCopy(): Parsed.Entity {
     return copy(
         fields = ArrayList(fields.map { it.copy() }),
         relations = ArrayList(relations.map { it.copy() }),
-        indices = ArrayList(indices.map { ArrayList(it) })
+        indexes = ArrayList(indexes.map { ArrayList(it) })
     )
 }
 

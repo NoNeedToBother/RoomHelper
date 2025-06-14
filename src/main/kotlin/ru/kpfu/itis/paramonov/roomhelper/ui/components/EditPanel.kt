@@ -17,7 +17,6 @@ import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
-import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JTextField
@@ -32,7 +31,7 @@ class EditPanel(
 
     private var contentPane: JBScrollPane? = null
 
-    private var indicesComponents = listOf<JComponent>()
+    private var indexPanel: JPanel? = null
 
     init {
         layout = BorderLayout()
@@ -48,6 +47,8 @@ class EditPanel(
             add(JButton("Save").apply {
                 addActionListener {
                     contentPane?.let { this@EditPanel.remove(it) }
+                    this@EditPanel.revalidate()
+                    this@EditPanel.repaint()
                     _editBuffer?.let { onSave(it.deepCopy()) }
                 }
             })
@@ -71,10 +72,17 @@ class EditPanel(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             background = JBColor.background()
 
-            paintFields(
-                panel = this,
-                entity = entity
-            )
+            paintFields(panel = this, entity = entity)
+            if (entity is Parsed.Entity) {
+                add(JLabel("Edit indexes").apply {
+                    font = font.deriveFont(Font.BOLD, 12f)
+                })
+                add(JPanel().apply {
+                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                    indexPanel = this
+                    paintIndexes(panel = this, entity = entity)
+                })
+            }
         }
 
         JBScrollPane(contentPanel).let {
@@ -96,29 +104,28 @@ class EditPanel(
             .forEach { field ->
                 var bufferName = field.name
                 val fieldPanel = JPanel(BorderLayout()).apply panel@ {
-                    preferredSize = Dimension(300, FIELD_HEIGHT)
-                    maximumSize = Dimension(600, FIELD_HEIGHT)
+                    preferredSize = Dimension(EDIT_BLOCK_WIDTH, EDIT_BLOCK_HEIGHT)
+                    maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH, EDIT_BLOCK_HEIGHT)
                     background = JBColor.background()
 
                     add(JPanel(BorderLayout()).apply westPanel@ {
-                        preferredSize = Dimension(150, FIELD_HEIGHT)
-                        maximumSize = Dimension(300 - FIELD_HEIGHT, FIELD_HEIGHT)
+                        preferredSize = Dimension(EDIT_BLOCK_WIDTH / 2, EDIT_BLOCK_HEIGHT)
+                        maximumSize = Dimension(
+                            EDIT_BLOCK_MAXIMUM_WIDTH / 2 - EDIT_BLOCK_HEIGHT,
+                            EDIT_BLOCK_HEIGHT
+                        )
 
-                        add(JButton(
-                            IconUtil.colorize(AllIcons.Actions.DeleteTag, JBColor.RED)
-                        ).apply {
-                            preferredSize = Dimension(FIELD_HEIGHT, FIELD_HEIGHT)
-                            minimumSize = Dimension(FIELD_HEIGHT, FIELD_HEIGHT)
-                            toolTipText = "Delete"
-                            border = BorderFactory.createEmptyBorder()
-                            addActionListener {
-                                editBuffer.fields = editBuffer.fields.filter { it.name != bufferName }
-                                if (editBuffer is Parsed.Entity) {
-                                    (editBuffer as Parsed.Entity).indices =
-                                        (editBuffer as Parsed.Entity).indices
-                                            .filter { index -> !index.contains(bufferName) }
+                        add(RemoveButton(EDIT_BLOCK_HEIGHT) {
+                            editBuffer.fields = editBuffer.fields.filter { it.name != bufferName }
+                            if (editBuffer is Parsed.Entity) {
+                                (editBuffer as Parsed.Entity).indexes =
+                                    (editBuffer as Parsed.Entity).indexes
+                                        .filter { index -> !index.contains(bufferName) }
+                                indexPanel?.let {
+                                    it.removeAll()
+                                    paintIndexes(it, editBuffer as Parsed.Entity)
+                                    it.revalidate()
                                 }
-                                this@panel.recursiveDisable()
                             }
                         }, BorderLayout.WEST)
 
@@ -130,12 +137,17 @@ class EditPanel(
                                     else it.copy()
                                 }
                                 if (editBuffer is Parsed.Entity) {
-                                    (editBuffer as Parsed.Entity).indices = (editBuffer as Parsed.Entity).indices
+                                    (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
                                         .map { index ->
                                             if (index.contains(bufferName)) index.map { indexPart ->
                                                 if (indexPart == bufferName) name else indexPart
                                             } else index
                                         }
+                                    indexPanel?.let {
+                                        it.removeAll()
+                                        paintIndexes(it, editBuffer as Parsed.Entity)
+                                        it.revalidate()
+                                    }
                                 }
                                 bufferName = name
                             }
@@ -143,8 +155,8 @@ class EditPanel(
                     }, BorderLayout.WEST)
 
                     add(JPanel(BorderLayout()).apply {
-                        preferredSize = Dimension(150, FIELD_HEIGHT)
-                        maximumSize = Dimension(300, FIELD_HEIGHT)
+                        preferredSize = Dimension(EDIT_BLOCK_WIDTH / 2, EDIT_BLOCK_HEIGHT)
+                        maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH / 2, EDIT_BLOCK_HEIGHT)
                         add(JTextField(field.type).apply {
                             toolTipText = "Edit field type"
                             addTextChangedListener { type ->
@@ -161,7 +173,7 @@ class EditPanel(
                             add(JBCheckBox("PK").apply {
                                 isSelected = field.isPrimaryKey || field.isPartOfCompositeKey
                                 toolTipText = "Is primary key or part of one"
-                                addActionListener { e ->
+                                addActionListener {
                                     updatePrimaryKeys(bufferName, isSelected)
                                 }
                             })
@@ -232,17 +244,49 @@ class EditPanel(
         }
     }
 
-    private fun paintIndices(panel: JPanel, entity: Parsed.Entity) {
-        panel.add(JLabel("Edit fields").apply {
-            font = font.deriveFont(Font.BOLD, 12f)
-        }, BorderLayout.NORTH)
+    private fun paintIndexes(panel: JPanel, entity: Parsed.Entity) {
+        entity.indexes.forEach { index ->
+            val indexPanel = JPanel(BorderLayout()).apply indexPanel@ {
+                preferredSize = Dimension(EDIT_BLOCK_WIDTH, EDIT_BLOCK_HEIGHT)
+                maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH, EDIT_BLOCK_HEIGHT)
+                background = JBColor.background()
 
-        entity.indices.forEach { index ->
+                add(JPanel(BorderLayout()).apply {
+                    add(RemoveButton(EDIT_BLOCK_HEIGHT) {
+                        if (editBuffer is Parsed.Entity) {
+                            (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
+                                .filter { it.all { indexPart -> index.contains(indexPart) } }
+                        }
+                        this@indexPanel.recursiveDisable()
+                    }, BorderLayout.WEST)
+                    add(JLabel(index.joinToString(", ")), BorderLayout.CENTER)
+                }, BorderLayout.CENTER)
+            }
 
+            panel.add(indexPanel)
+            panel.add(Box.createVerticalStrut(5))
         }
     }
 
     companion object {
-        private const val FIELD_HEIGHT = 50
+        private const val EDIT_BLOCK_HEIGHT = 50
+        private const val EDIT_BLOCK_WIDTH = 300
+        private const val EDIT_BLOCK_MAXIMUM_WIDTH = 600
+    }
+}
+
+class RemoveButton(size: Int, onClick: () -> Unit) : JButton(
+    IconUtil.colorize(AllIcons.Actions.DeleteTag, JBColor.RED)
+) {
+
+    init {
+        preferredSize = Dimension(size, size)
+        minimumSize = Dimension(size, size)
+        toolTipText = "Delete"
+        border = BorderFactory.createEmptyBorder()
+
+        addActionListener {
+            onClick()
+        }
     }
 }

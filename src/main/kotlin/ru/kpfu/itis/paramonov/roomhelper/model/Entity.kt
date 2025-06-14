@@ -8,7 +8,7 @@ sealed class Parsed {
         override val name: String,
         override var fields: List<Field>,
         var relations: List<Relation>,
-        var indices: List<List<String>> = emptyList(),
+        var indexes: List<List<String>> = emptyList(),
     ) : Parsed()
 
     data class Embedded(

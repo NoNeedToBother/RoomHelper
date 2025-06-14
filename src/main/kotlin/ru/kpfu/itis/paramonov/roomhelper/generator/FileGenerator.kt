@@ -25,7 +25,7 @@ class FileGenerator {
             .filter { !relationFields.contains(it.name) }
             .joinToString("$lineSeparator\t\t") { generateFieldLine(it) }
         val relations = entity.relations.joinToString("$lineSeparator\t\t") { generateRelationLine(it) }
-        val indices = entity.indices.joinToString("$lineSeparator\t\t") { it.joinToString(", ") }
+        val indices = entity.indexes.joinToString("$lineSeparator\t\t") { it.joinToString(", ") }
 
         return """
             |entity ${entity.name}:

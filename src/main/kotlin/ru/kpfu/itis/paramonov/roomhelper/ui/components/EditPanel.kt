@@ -113,7 +113,7 @@ class EditPanel(
                 paintFields(panel = this, entity = entity)
             })
             add(JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-                add(JButton("Add new").apply {
+                add(JButton("Add new field").apply {
                     addActionListener {
                         val newField = Field(name = "untitled$newFieldIndex", type = "")
                         editBuffer.fields = editBuffer.fields.toMutableList().apply { add(newField) }
@@ -140,6 +140,21 @@ class EditPanel(
                     layout = BoxLayout(this, BoxLayout.Y_AXIS)
                     indexPanel = this
                     paintIndexes(panel = this, entity = entity)
+                })
+                add(JPanel(FlowLayout(FlowLayout.LEFT)).apply {
+                    add(JButton("Add new index").apply {
+                        addActionListener {
+                            val newIndex = emptyList<String>()
+                            (editBuffer as Parsed.Entity).indexes =
+                                (editBuffer as Parsed.Entity).indexes.toMutableList().apply { add(newIndex) }
+                            val indexPanel = indexPanel(entity, newIndex)
+                            this@EditPanel.indexPanel?.apply {
+                                add(indexPanel)
+                                add(Box.createVerticalStrut(5))
+                                revalidate()
+                            }
+                        }
+                    })
                 })
             }
         }
@@ -171,26 +186,46 @@ class EditPanel(
 
     private fun paintIndexes(panel: JPanel, entity: Parsed.Entity) {
         entity.indexes.forEach { index ->
-            val indexPanel = JPanel(BorderLayout()).apply indexPanel@ {
-                preferredSize = Dimension(EDIT_BLOCK_WIDTH, EDIT_BLOCK_HEIGHT)
-                maximumSize = Dimension(EDIT_BLOCK_MAXIMUM_WIDTH, EDIT_BLOCK_HEIGHT)
-                background = JBColor.background()
-
-                add(JPanel(BorderLayout()).apply {
-                    add(RemoveButton(EDIT_BLOCK_HEIGHT) {
-                        if (editBuffer is Parsed.Entity) {
-                            (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
-                                .filter { it.all { indexPart -> index.contains(indexPart) } }
-                        }
-                        this@indexPanel.recursiveDisable()
-                    }, BorderLayout.WEST)
-                    add(JLabel(index.joinToString(", ")), BorderLayout.CENTER)
-                }, BorderLayout.CENTER)
-            }
+            val indexPanel = indexPanel(entity, index)
 
             panel.add(indexPanel)
             panel.add(Box.createVerticalStrut(5))
         }
+    }
+
+    private fun indexPanel(
+        entity: Parsed, index: List<String>,
+    ): IndexPanel {
+        fun updateIndex(newIndex: List<String>) {
+            if (editBuffer is Parsed.Entity) {
+                (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
+                    .map { if (it == index) newIndex else it }
+                indexPanel?.let {
+                    it.removeAll()
+                    paintIndexes(it, editBuffer as Parsed.Entity)
+                    it.revalidate()
+                }
+            }
+        }
+        return IndexPanel(
+            fieldWidth = EDIT_BLOCK_WIDTH,
+            fieldHeight = EDIT_BLOCK_HEIGHT * 3 / 2,
+            maximumWidth = EDIT_BLOCK_MAXIMUM_WIDTH,
+            entity = entity, index = index,
+            onRemoveClicked = {
+                if (editBuffer is Parsed.Entity) {
+                    (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
+                        .filter { it.all { indexPart -> index.contains(indexPart) } }
+                    indexPanel?.let {
+                        it.removeAll()
+                        paintIndexes(it, editBuffer as Parsed.Entity)
+                        it.revalidate()
+                    }
+                }
+            },
+            onNewFieldAdded = { newIndex -> updateIndex(newIndex) },
+            onFieldRemoved = { newIndex -> updateIndex(newIndex) },
+        )
     }
 
     private fun fieldPanel(

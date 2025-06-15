@@ -10,6 +10,7 @@ import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.state.DatabaseFilePersistentState
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EditPanel
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityBlock
+import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityType
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.MenuBar
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.RelationshipArrow
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
@@ -80,14 +81,29 @@ class RoomHelperWindow : DialogWrapper(true) {
                     showErrorMessage(e)
                 }
             },
-            onNewFile = {
+            onNewFileClicked = {
                 DatabaseFilePersistentState.getInstance().state.value = null
                 isNewFile = true
                 history.clear()
                 changeTitle(null)
                 updateUIOnEdit()
             },
-            onSave = { save() }
+            onSaveClicked = { save() },
+            onAddEntityClicked = { entityName, entityType ->
+                val newEntity = when (entityType) {
+                    EntityType.Regular -> Parsed.Entity(entityName)
+                    EntityType.Embedded -> Parsed.Embedded(entityName)
+                    EntityType.ManyToMany -> Parsed.ManyToMany(entityName)
+                }
+                val newState = ArrayList(history.currentState.map { it.deepCopy() })
+                    .apply { add(newEntity) }
+                history.add(newState)
+
+                entitiesPane?.let {
+                    paintUI(it)
+                }
+            },
+            isNameUnique = { name -> history.currentState.none { it.name == name } }
         ).apply {
             menuBar = this
         }

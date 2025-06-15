@@ -6,20 +6,20 @@ sealed class Parsed {
 
     data class Entity(
         override val name: String,
-        override var fields: List<Field>,
-        var relations: List<Relation>,
+        override var fields: List<Field> = emptyList(),
+        var relations: List<Relation> = emptyList(),
         var indexes: List<List<String>> = emptyList(),
     ) : Parsed()
 
     data class Embedded(
         override val name: String,
-        override var fields: List<Field>,
+        override var fields: List<Field> = emptyList(),
     ) : Parsed()
 
     data class ManyToMany(
         override val name: String,
-        override var fields: List<Field>,
-        var relations: List<Relation>,
+        override var fields: List<Field> = emptyList(),
+        var relations: List<Relation> = emptyList(),
     ) : Parsed()
 }
 

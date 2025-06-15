@@ -12,8 +12,10 @@ class MenuBar(
     private val onUpdate: (MenuBar) -> Unit,
     private val history: DatabaseStateHistory,
     private val onFileChosen: (String) -> Unit,
-    private val onNewFile: () -> Unit,
-    private val onSave: () -> Unit,
+    private val onNewFileClicked: () -> Unit,
+    private val onSaveClicked: () -> Unit,
+    private val onAddEntityClicked: (String, EntityType) -> Unit,
+    private val isNameUnique: (String) -> Boolean,
 ): JMenuBar() {
 
     private var undoButton: JBMenuItem? = null
@@ -36,7 +38,7 @@ class MenuBar(
         return JMenu("File").apply {
             add(JBMenuItem("New").apply {
                 addActionListener {
-                    onNewFile()
+                    onNewFileClicked()
                 }
             })
             add(JBMenuItem("Open").apply {
@@ -49,7 +51,7 @@ class MenuBar(
             addSeparator()
             add(JBMenuItem("Save").apply {
                 addActionListener {
-                    onSave()
+                    onSaveClicked()
                 }
             })
             addSeparator()
@@ -63,7 +65,14 @@ class MenuBar(
 
     private fun editMenu(): JMenu {
         return JMenu("Edit").apply menu@ {
-            add(JBMenuItem("Add entity").apply {})
+            add(JBMenuItem("Add entity").apply {
+                addActionListener {
+                    AddEntityDialog(
+                        onChosen = onAddEntityClicked,
+                        isNameUnique = isNameUnique
+                    ).show()
+                }
+            })
             addSeparator()
             add(JBMenuItem("Undo").apply {
                 undoButton = this

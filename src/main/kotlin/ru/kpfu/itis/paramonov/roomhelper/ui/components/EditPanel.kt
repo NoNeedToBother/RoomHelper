@@ -9,6 +9,7 @@ import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
 import ru.kpfu.itis.paramonov.roomhelper.util.recursiveDisable
+import ru.kpfu.itis.paramonov.roomhelper.util.relations
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -40,8 +41,11 @@ class EditPanel(
 
     private var fieldPanel: JPanel? = null
     private var indexPanel: JPanel? = null
+    private var relationPanel: JPanel? = null
+    private var addRelationButton: JButton? = null
 
     private var newFieldIndex = 1
+    private var newRelationIndex = 1
 
     init {
         layout = BorderLayout()
@@ -61,6 +65,7 @@ class EditPanel(
                     this@EditPanel.revalidate()
                     this@EditPanel.repaint()
                     newFieldIndex = 1
+                    newRelationIndex = 1
                 }
             })
             add(JButton("Cancel").apply {
@@ -82,6 +87,7 @@ class EditPanel(
         this@EditPanel.revalidate()
         this@EditPanel.repaint()
         newFieldIndex = 1
+        newRelationIndex = 1
         _editBuffer = null
         entity = null
         relationUpdates = mutableListOf()
@@ -157,6 +163,36 @@ class EditPanel(
                     })
                 })
             }
+            if (entity is Parsed.Entity || entity is Parsed.ManyToMany) {
+                add(JLabel("Edit relations").apply {
+                    font = font.deriveFont(Font.BOLD, 16f)
+                })
+                add(JPanel().apply {
+                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                    relationPanel = this
+                    paintRelations(panel = this, entity = entity)
+                })
+                add(JPanel(FlowLayout(FlowLayout.LEFT)).apply {
+                    add(JButton("Add new relation").apply {
+                        addRelationButton = this
+                        addActionListener {
+                            val newRelation = Relation("untitled$newRelationIndex",
+                                "", "", "", "")
+                            newRelationIndex++
+                            val updated = editBuffer.relations().toMutableList().apply { add(newRelation) }
+                            if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
+                            if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
+                            val bufferNameStore = BufferNameStore(newRelation.name)
+                            val relationPanel = relationPanel(entity, newRelation, bufferNameStore)
+                            this@EditPanel.relationPanel?.apply {
+                                add(relationPanel)
+                                add(Box.createVerticalStrut(5))
+                                revalidate()
+                            }
+                        }
+                    })
+                })
+            }
         }
 
         JBScrollPane(contentPanel).let {
@@ -193,6 +229,73 @@ class EditPanel(
         }
     }
 
+    private fun paintRelations(panel: JPanel, entity: Parsed) {
+        entity.relations().forEach { relation ->
+            val bufferNameStore = BufferNameStore(relation.name)
+            val relationPanel = relationPanel(entity, relation, bufferNameStore)
+
+            panel.add(relationPanel)
+            panel.add(Box.createVerticalStrut(5))
+        }
+    }
+
+    private fun relationPanel(
+        entity: Parsed, relation: Relation,
+        bufferNameStore: BufferNameStore,
+    ): RelationPanel {
+        fun updateRelations(update: (Relation) -> Relation) {
+            var changed = false
+            val updated = editBuffer.relations()
+                .map { if (it.name == bufferNameStore.bufferName && !changed) {
+                    changed = true
+                    update(it)
+                } else it }
+            if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
+            if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
+        }
+        return RelationPanel(
+            fieldWidth = EDIT_BLOCK_WIDTH,
+            fieldHeight = EDIT_BLOCK_HEIGHT * 3 / 2,
+            maximumWidth = EDIT_BLOCK_MAXIMUM_WIDTH * 2 / 3,
+            entity = entity, relation = relation,
+            onRemoveClicked = {
+                var removed = false
+                val updated = entity.relations().filter {
+                    if (it.name == bufferNameStore.bufferName && !removed &&
+                                checkBufferAndOtherEntityRelationOverlap(it, relation)) {
+                        removed = true
+                        false
+                    }
+                    else true
+                }
+                if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
+                if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
+                relationPanel?.repaintProperties { paintRelations(it, editBuffer) }
+            },
+            onNameChanged = { name ->
+                var changed = false
+                val updated = editBuffer.relations()
+                    .map { if (it.name == bufferNameStore.bufferName && !changed &&
+                        checkBufferAndOtherEntityRelationOverlap(it, relation)) {
+                        changed = true
+                        it.copy(name = name)
+                    } else it }
+                if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
+                if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
+                bufferNameStore.bufferName = name
+            },
+            onTypeChanged = { type ->
+                updateRelations { relation -> relation.copy(type = type) }
+            },
+            onRefTableChanged = { refTable ->
+                updateRelations { relation -> relation.copy(refTable = refTable) }
+            },
+            onRefColumnChanged = { refColumn ->
+                updateRelations { relation -> relation.copy(refColumn = refColumn) }
+            },
+        )
+    }
+
     private fun indexPanel(
         entity: Parsed, index: List<String>,
     ): IndexPanel {
@@ -204,11 +307,7 @@ class EditPanel(
                         indexChanged = true
                         newIndex
                     } else it }
-                indexPanel?.let {
-                    it.removeAll()
-                    paintIndexes(it, editBuffer as Parsed.Entity)
-                    it.revalidate()
-                }
+                indexPanel?.repaintProperties { paintIndexes(it, editBuffer as Parsed.Entity) }
             }
         }
         return IndexPanel(
@@ -220,11 +319,7 @@ class EditPanel(
                 if (editBuffer is Parsed.Entity) {
                     (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
                         .filter { it.all { indexPart -> index.contains(indexPart) } }
-                    indexPanel?.let {
-                        it.removeAll()
-                        paintIndexes(it, editBuffer as Parsed.Entity)
-                        it.revalidate()
-                    }
+                    indexPanel?.repaintProperties { paintIndexes(it, editBuffer as Parsed.Entity) }
                 }
             },
             onNewFieldAdded = { newIndex -> updateIndex(newIndex) },
@@ -247,11 +342,7 @@ class EditPanel(
                     (editBuffer as Parsed.Entity).indexes =
                         (editBuffer as Parsed.Entity).indexes
                             .filter { index -> !index.contains(bufferNameStore.bufferName) }
-                    indexPanel?.let {
-                        it.removeAll()
-                        paintIndexes(it, editBuffer as Parsed.Entity)
-                        it.revalidate()
-                    }
+                    indexPanel?.repaintProperties { paintIndexes(it, editBuffer as Parsed.Entity) }
                 }
                 panel.recursiveDisable()
             },
@@ -318,6 +409,11 @@ class EditPanel(
                 bufferField.isPartOfCompositeKey == otherField.isPartOfCompositeKey &&
                 bufferField.isUnique == otherField.isUnique && bufferField.isEmbedded == otherField.isEmbedded &&
                 bufferField.isNotNull == otherField.isNotNull
+    }
+
+    private fun checkBufferAndOtherEntityRelationOverlap(bufferRelation: Relation, otherRelation: Relation): Boolean {
+        return bufferRelation.type == otherRelation.type && bufferRelation.refTable == otherRelation.refTable &&
+                bufferRelation.refColumn == otherRelation.refColumn
     }
 
     private fun updateOtherEntityRelations(newName: String, bufferNameStore: BufferNameStore) {
@@ -403,6 +499,8 @@ class EditPanel(
         }
     }
 
+    // needed to retrieve previous field or relation name for updating indexes, relations and editBuffer,
+    // or settings new properties in editBuffer
     private data class BufferNameStore(var bufferName: String)
 
     companion object {
@@ -410,6 +508,12 @@ class EditPanel(
         private const val EDIT_BLOCK_WIDTH = 300
         private const val EDIT_BLOCK_MAXIMUM_WIDTH = 600
     }
+}
+
+private fun JPanel.repaintProperties(paint: (JPanel) -> Unit) {
+    removeAll()
+    paint(this)
+    revalidate()
 }
 
 class RemoveButton(size: Int, onClick: () -> Unit) : JButton(

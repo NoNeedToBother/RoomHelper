@@ -14,6 +14,7 @@ import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityType
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.MenuBar
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.RelationshipArrow
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
+import ru.kpfu.itis.paramonov.roomhelper.util.relations
 import ru.kpfu.itis.paramonov.roomhelper.util.showErrorMessage
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -137,6 +138,17 @@ class RoomHelperWindow : DialogWrapper(true) {
         return EditPanel(
             onSave = { updatedEntity, otherEntityRelationUpdates ->
                 val newState = history.currentState.map { it.deepCopy() }.toMutableList()
+                if (updatedEntity is Parsed.Entity || updatedEntity is Parsed.ManyToMany) {
+                    val updated = updatedEntity.relations().map { relation ->
+                        newState.find { it.name == relation.refTable }
+                            ?.fields?.find { it.name == relation.refColumn }
+                            ?.type?.let { fieldType ->
+                                relation.copy(fieldType = fieldType)
+                            } ?: relation
+                    }
+                    if (updatedEntity is Parsed.Entity) updatedEntity.relations = updated
+                    if (updatedEntity is Parsed.ManyToMany) updatedEntity.relations = updated
+                }
                 newState.removeIf { it.name == updatedEntity.name }
                 newState.add(updatedEntity)
                 otherEntityRelationUpdates.forEach { update ->
@@ -241,6 +253,7 @@ class RoomHelperWindow : DialogWrapper(true) {
             changeUndoButton(!history.isFirstState)
         }
         changeSavedStatus(false)
+        editPanel?.endCurrentEditing()
     }
 
     private fun openDatabaseFile(): File {

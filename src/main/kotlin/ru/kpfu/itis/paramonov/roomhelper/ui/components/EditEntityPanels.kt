@@ -6,10 +6,12 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
+import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import ru.kpfu.itis.paramonov.roomhelper.util.addTextChangedListener
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComboBox
 import javax.swing.JLabel
@@ -164,6 +166,60 @@ class IndexPanel(
                         )
                     }
                 }
+            })
+        }, BorderLayout.SOUTH)
+    }
+}
+
+class RelationPanel(
+    fieldWidth: Int, maximumWidth: Int, fieldHeight: Int,
+    val entity: Parsed, val relation: Relation,
+    private val onRemoveClicked: () -> Unit,
+    private val onNameChanged: (String) -> Unit,
+    private val onTypeChanged: (String) -> Unit,
+    private val onRefTableChanged: (String) -> Unit,
+    private val onRefColumnChanged: (String) -> Unit,
+) : JPanel(BorderLayout()) {
+
+    init {
+        if (entity !is Parsed.Embedded)
+            init(fieldWidth = fieldWidth, fieldHeight = fieldHeight, maximumWidth = maximumWidth)
+    }
+
+    private fun init(fieldWidth: Int, fieldHeight: Int, maximumWidth: Int) {
+        preferredSize = Dimension(fieldWidth, fieldHeight)
+        maximumSize = Dimension(maximumWidth, fieldHeight)
+        background = JBColor.background()
+
+        add(JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(RemoveButton(fieldHeight) {
+                onRemoveClicked()
+            })
+            add(JTextField(relation.name).apply {
+                addTextChangedListener { name -> onNameChanged(name) }
+            })
+            if (entity is Parsed.Entity) {
+                add(ComboBox<String>().apply {
+                    model = CollectionComboBoxModel(listOf("o2o", "m2o"))
+                    addActionListener {
+                        if (selectedItem != null) onTypeChanged(selectedItem as String)
+                    }
+                })
+            } else if (entity is Parsed.ManyToMany) {
+                add(JLabel("m2m"))
+            }
+        }, BorderLayout.CENTER)
+
+        add(JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(JTextField(relation.refTable).apply {
+                toolTipText = "Enter reference table"
+                addTextChangedListener { refTable -> onRefTableChanged(refTable) }
+            })
+            add(JTextField(relation.refColumn).apply {
+                toolTipText = "Enter reference column"
+                addTextChangedListener { column -> onRefColumnChanged(column) }
             })
         }, BorderLayout.SOUTH)
     }

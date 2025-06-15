@@ -1,6 +1,7 @@
 package ru.kpfu.itis.paramonov.roomhelper.util
 
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
+import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import java.util.Locale.getDefault
 
 fun String.capitalize() = this.replaceFirstChar { if (it.isLowerCase()) it.titlecase(
@@ -12,6 +13,14 @@ fun Parsed.deepCopy(): Parsed {
         is Parsed.Entity -> deepCopy()
         is Parsed.ManyToMany -> deepCopy()
         is Parsed.Embedded -> deepCopy()
+    }
+}
+
+fun Parsed.relations(): List<Relation> {
+    return when (this) {
+        is Parsed.Entity -> relations
+        is Parsed.ManyToMany -> relations
+        is Parsed.Embedded -> emptyList()
     }
 }
 

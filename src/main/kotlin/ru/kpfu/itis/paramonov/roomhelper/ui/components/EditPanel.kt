@@ -197,9 +197,13 @@ class EditPanel(
         entity: Parsed, index: List<String>,
     ): IndexPanel {
         fun updateIndex(newIndex: List<String>) {
+            var indexChanged = false
             if (editBuffer is Parsed.Entity) {
                 (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
-                    .map { if (it == index) newIndex else it }
+                    .map { if (it == index && !indexChanged) {
+                        indexChanged = true
+                        newIndex
+                    } else it }
                 indexPanel?.let {
                     it.removeAll()
                     paintIndexes(it, editBuffer as Parsed.Entity)
@@ -252,16 +256,26 @@ class EditPanel(
                 panel.recursiveDisable()
             },
             onNameChanged = { name ->
+                var fieldChanged = false
                 updateOtherEntityRelations(name, bufferNameStore)
                 editBuffer.fields = editBuffer.fields.map {
-                    if (bufferNameStore.bufferName == it.name) it.copy(name = name)
+                    if (bufferNameStore.bufferName == it.name && !fieldChanged &&
+                        checkBufferAndOtherEntityFieldOverlap(it, field)) {
+
+                        fieldChanged = true
+                        it.copy(name = name)
+                    }
                     else it.copy()
                 }
                 if (editBuffer is Parsed.Entity) {
                     (editBuffer as Parsed.Entity).indexes = (editBuffer as Parsed.Entity).indexes
                         .map { index ->
+                            var indexChanged = false
                             if (index.contains(bufferNameStore.bufferName)) index.map { indexPart ->
-                                if (indexPart == bufferNameStore.bufferName) name else indexPart
+                                if (indexPart == bufferNameStore.bufferName && !indexChanged) {
+                                    indexChanged = true
+                                    name
+                                } else indexPart
                             } else index
                         }
                     indexPanel?.let {
@@ -294,6 +308,16 @@ class EditPanel(
                 }
             },
         )
+    }
+
+    // needed to check on field change whether buffer field and other entity overlap in everything other than
+    // name (since it is being changed) to not edit the wrong field, if they do coincide than it does not matter
+    // which one of those two entities should be edited
+    private fun checkBufferAndOtherEntityFieldOverlap(bufferField: Field, otherField: Field): Boolean {
+        return bufferField.type == otherField.type && bufferField.isPrimaryKey == otherField.isPrimaryKey &&
+                bufferField.isPartOfCompositeKey == otherField.isPartOfCompositeKey &&
+                bufferField.isUnique == otherField.isUnique && bufferField.isEmbedded == otherField.isEmbedded &&
+                bufferField.isNotNull == otherField.isNotNull
     }
 
     private fun updateOtherEntityRelations(newName: String, bufferNameStore: BufferNameStore) {

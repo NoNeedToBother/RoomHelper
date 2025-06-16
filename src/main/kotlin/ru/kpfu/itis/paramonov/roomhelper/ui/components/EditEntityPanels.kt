@@ -1,9 +1,11 @@
 package ru.kpfu.itis.paramonov.roomhelper.ui.components
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.CollectionComboBoxModel
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
+import com.intellij.util.IconUtil
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
@@ -11,6 +13,7 @@ import ru.kpfu.itis.paramonov.roomhelper.util.addTextChangedListener
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComboBox
@@ -222,5 +225,21 @@ class RelationPanel(
                 addTextChangedListener { column -> onRefColumnChanged(column) }
             })
         }, BorderLayout.SOUTH)
+    }
+}
+
+class RemoveButton(size: Int, onClick: () -> Unit) : JButton(
+    IconUtil.colorize(AllIcons.Actions.DeleteTag, JBColor.RED)
+) {
+
+    init {
+        preferredSize = Dimension(size, size)
+        minimumSize = Dimension(size, size)
+        toolTipText = "Delete"
+        border = BorderFactory.createEmptyBorder()
+
+        addActionListener {
+            onClick()
+        }
     }
 }

@@ -1,19 +1,18 @@
 package ru.kpfu.itis.paramonov.roomhelper.ui.components
 
-import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.util.IconUtil
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
+import ru.kpfu.itis.paramonov.roomhelper.util.equalsIgnoring
 import ru.kpfu.itis.paramonov.roomhelper.util.recursiveDisable
 import ru.kpfu.itis.paramonov.roomhelper.util.relations
 import java.awt.BorderLayout
-import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
+import java.util.ArrayList
 import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
@@ -102,7 +101,7 @@ class EditPanel(
             is Parsed.ManyToMany -> entity.copy()
         }
         contentPane?.let { remove(it) }
-        paintEditMenu(entity)
+        paintEditMenu(editBuffer)
     }
 
     private fun paintEditMenu(entity: Parsed) {
@@ -249,7 +248,7 @@ class EditPanel(
                 .map { if (it.name == bufferNameStore.bufferName && !changed) {
                     changed = true
                     update(it)
-                } else it }
+                } else it.copy() }
             if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
             if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
         }
@@ -262,7 +261,7 @@ class EditPanel(
                 var removed = false
                 val updated = entity.relations().filter {
                     if (it.name == bufferNameStore.bufferName && !removed &&
-                                checkBufferAndOtherEntityRelationOverlap(it, relation)) {
+                        it.equalsIgnoring(relation, ignoreName = true)) {
                         removed = true
                         false
                     }
@@ -276,10 +275,10 @@ class EditPanel(
                 var changed = false
                 val updated = editBuffer.relations()
                     .map { if (it.name == bufferNameStore.bufferName && !changed &&
-                        checkBufferAndOtherEntityRelationOverlap(it, relation)) {
+                        it.equalsIgnoring(relation, ignoreName = true)) {
                         changed = true
                         it.copy(name = name)
-                    } else it }
+                    } else it.copy() }
                 if (editBuffer is Parsed.Entity) (editBuffer as Parsed.Entity).relations = updated
                 if (editBuffer is Parsed.ManyToMany) (editBuffer as Parsed.ManyToMany).relations = updated
                 bufferNameStore.bufferName = name
@@ -306,7 +305,7 @@ class EditPanel(
                     .map { if (it == index && !indexChanged) {
                         indexChanged = true
                         newIndex
-                    } else it }
+                    } else ArrayList(it) }
                 indexPanel?.repaintProperties { paintIndexes(it, editBuffer as Parsed.Entity) }
             }
         }
@@ -331,6 +330,14 @@ class EditPanel(
         entity: Parsed, field: Field,
         bufferNameStore: BufferNameStore,
     ): FieldPanel {
+        fun updateField(update: (Field) -> Field) {
+            var changed = false
+            editBuffer.fields = editBuffer.fields
+                .map { if (it.name == bufferNameStore.bufferName && !changed) {
+                    changed = true
+                    update(it)
+                } else it.copy() }
+        }
         return FieldPanel(
             fieldWidth = EDIT_BLOCK_WIDTH,
             fieldHeight = EDIT_BLOCK_HEIGHT,
@@ -351,7 +358,7 @@ class EditPanel(
                 updateOtherEntityRelations(name, bufferNameStore)
                 editBuffer.fields = editBuffer.fields.map {
                     if (bufferNameStore.bufferName == it.name && !fieldChanged &&
-                        checkBufferAndOtherEntityFieldOverlap(it, field)) {
+                        it.equalsIgnoring(field, ignoreName = true)) {
 
                         fieldChanged = true
                         it.copy(name = name)
@@ -369,58 +376,30 @@ class EditPanel(
                                 } else indexPart
                             } else index
                         }
-                    indexPanel?.let {
-                        it.removeAll()
-                        paintIndexes(it, editBuffer as Parsed.Entity)
-                        it.revalidate()
-                    }
+                    indexPanel?.repaintProperties { paintIndexes(it, editBuffer as Parsed.Entity) }
                 }
                 bufferNameStore.bufferName = name
             },
             onTypeChanged = { type ->
-                editBuffer.fields = editBuffer.fields.map {
-                    if (bufferNameStore.bufferName == it.name) it.copy(type = type)
-                    else it.copy()
-                }
+                updateField { it.copy(type = type) }
             },
             onPrimaryKeyCheckBoxClicked = { checked ->
                 updatePrimaryKeys(bufferNameStore.bufferName, checked)
             },
             onUniqueCheckBoxClicked = { checked ->
-                editBuffer.fields = editBuffer.fields.map {
-                    if (it.name == bufferNameStore.bufferName) it.copy(isUnique = checked)
-                    else it
-                }
+                updateField { it.copy(isUnique = checked) }
             },
             onNotNullCheckBoxClicked = { checked ->
-                editBuffer.fields = editBuffer.fields.map {
-                    if (it.name == bufferNameStore.bufferName) it.copy(isNotNull = checked)
-                    else it
-                }
+                updateField { it.copy(isNotNull = checked) }
             },
         )
-    }
-
-    // needed to check on field change whether buffer field and other entity overlap in everything other than
-    // name (since it is being changed) to not edit the wrong field, if they do coincide than it does not matter
-    // which one of those two entities should be edited
-    private fun checkBufferAndOtherEntityFieldOverlap(bufferField: Field, otherField: Field): Boolean {
-        return bufferField.type == otherField.type && bufferField.isPrimaryKey == otherField.isPrimaryKey &&
-                bufferField.isPartOfCompositeKey == otherField.isPartOfCompositeKey &&
-                bufferField.isUnique == otherField.isUnique && bufferField.isEmbedded == otherField.isEmbedded &&
-                bufferField.isNotNull == otherField.isNotNull
-    }
-
-    private fun checkBufferAndOtherEntityRelationOverlap(bufferRelation: Relation, otherRelation: Relation): Boolean {
-        return bufferRelation.type == otherRelation.type && bufferRelation.refTable == otherRelation.refTable &&
-                bufferRelation.refColumn == otherRelation.refColumn
     }
 
     private fun updateOtherEntityRelations(newName: String, bufferNameStore: BufferNameStore) {
         // check that field name is not same as others to prevent editing relations with other matched field
         if (editBuffer.fields.filter { it.name == bufferNameStore.bufferName }.size <= 1) {
             entities.forEach { entity ->
-                // check whether relation update was already added to not edit entities
+                // check whether relation update was already added to not specifically edit entities
                 if (relationUpdates.none { it.first == entity.name }) {
                     if (entity is Parsed.Entity) {
                         if (entity.relations.find { it.refTable == editBuffer.name }?.refColumn ==
@@ -514,20 +493,4 @@ private fun JPanel.repaintProperties(paint: (JPanel) -> Unit) {
     removeAll()
     paint(this)
     revalidate()
-}
-
-class RemoveButton(size: Int, onClick: () -> Unit) : JButton(
-    IconUtil.colorize(AllIcons.Actions.DeleteTag, JBColor.RED)
-) {
-
-    init {
-        preferredSize = Dimension(size, size)
-        minimumSize = Dimension(size, size)
-        toolTipText = "Delete"
-        border = BorderFactory.createEmptyBorder()
-
-        addActionListener {
-            onClick()
-        }
-    }
 }

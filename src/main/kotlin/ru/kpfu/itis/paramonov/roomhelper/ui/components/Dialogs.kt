@@ -6,9 +6,11 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.CollectionComboBoxModel
 import ru.kpfu.itis.paramonov.roomhelper.model.ValidationResult
 import ru.kpfu.itis.paramonov.roomhelper.util.addTextChangedListener
-import ru.kpfu.itis.paramonov.roomhelper.util.capitalize
+import ru.kpfu.itis.paramonov.roomhelper.util.validateEntityName
+import javax.swing.Action
 import javax.swing.BoxLayout
 import javax.swing.JComponent
+import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JTextField
 
@@ -51,7 +53,7 @@ class AddEntityDialog(
 
     override fun doOKAction() {
         entityName?.let { name ->
-            val validationResult = validateEntityName(name)
+            val validationResult = validateEntityName(name, isNameUnique)
             when (validationResult) {
                 is ValidationResult.Success ->
                     entityType?.let { type ->
@@ -67,17 +69,36 @@ class AddEntityDialog(
             "Entity name is empty",  "Add Fail"
         )
     }
+}
 
-    private fun validateEntityName(name: String): ValidationResult {
-        return if (name.isEmpty()) {
-            ValidationResult.Failure("Entity name is empty")
+class UnsavedCloseRationale(
+    private val onCloseAgree: () -> Unit,
+) : DialogWrapper(false) {
+
+    init {
+        init()
+    }
+
+    override fun createCenterPanel(): JComponent? {
+        return JPanel().apply {
+            add(JLabel("Are you sure you want to close without saving?"))
         }
-        else if (name.capitalize() != name) {
-            ValidationResult.Failure("Entity name should start with capital letter")
+    }
+
+    override fun getOKAction(): Action {
+        return super.getOKAction().apply {
+            putValue(Action.NAME, "Yes")
         }
-        else if (!isNameUnique(name)) {
-            ValidationResult.Failure("Entity with this name already exists")
+    }
+
+    override fun getCancelAction(): Action {
+        return super.getCancelAction().apply {
+            putValue(Action.NAME, "No")
         }
-        else ValidationResult.Success
+    }
+
+    override fun doOKAction() {
+        onCloseAgree()
+        super.doOKAction()
     }
 }

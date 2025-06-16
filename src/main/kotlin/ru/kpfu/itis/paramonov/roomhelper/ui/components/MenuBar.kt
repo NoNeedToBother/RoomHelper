@@ -2,7 +2,7 @@ package ru.kpfu.itis.paramonov.roomhelper.ui.components
 
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.JBMenuItem
-import ru.kpfu.itis.paramonov.roomhelper.model.DatabaseStateHistory
+import ru.kpfu.itis.paramonov.roomhelper.ui.model.DatabaseStateHistory
 import ru.kpfu.itis.paramonov.roomhelper.util.openFileChooser
 import javax.swing.JMenu
 import javax.swing.JMenuBar

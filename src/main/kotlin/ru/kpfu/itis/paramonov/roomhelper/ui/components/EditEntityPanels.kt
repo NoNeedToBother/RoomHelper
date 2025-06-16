@@ -204,7 +204,9 @@ class RelationPanel(
             })
             if (entity is Parsed.Entity) {
                 add(ComboBox<String>().apply {
-                    model = CollectionComboBoxModel(listOf("o2o", "m2o"))
+                    model = CollectionComboBoxModel(listOf("o2o", "m2o")).apply {
+                        selectedItem = relation.type.ifEmpty { "o2o" }
+                    }
                     addActionListener {
                         if (selectedItem != null) onTypeChanged(selectedItem as String)
                     }

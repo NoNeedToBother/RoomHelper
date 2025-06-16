@@ -1,4 +1,6 @@
-package ru.kpfu.itis.paramonov.roomhelper.model
+package ru.kpfu.itis.paramonov.roomhelper.ui.model
+
+import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 
 class DatabaseStateHistory {
     private val history = mutableListOf<List<Parsed>>(emptyList())

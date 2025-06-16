@@ -1,21 +1,25 @@
 package ru.kpfu.itis.paramonov.roomhelper.ui
 
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import ru.kpfu.itis.paramonov.roomhelper.generator.FileGenerator
 import ru.kpfu.itis.paramonov.roomhelper.generator.util.database.parseEntities
-import ru.kpfu.itis.paramonov.roomhelper.model.DatabaseStateHistory
+import ru.kpfu.itis.paramonov.roomhelper.ui.model.DatabaseStateHistory
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
+import ru.kpfu.itis.paramonov.roomhelper.model.ValidationResult
 import ru.kpfu.itis.paramonov.roomhelper.state.DatabaseFilePersistentState
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EditPanel
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityBlock
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.EntityType
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.MenuBar
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.RelationshipArrow
+import ru.kpfu.itis.paramonov.roomhelper.ui.components.UnsavedCloseRationale
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
 import ru.kpfu.itis.paramonov.roomhelper.util.relations
 import ru.kpfu.itis.paramonov.roomhelper.util.showErrorMessage
+import ru.kpfu.itis.paramonov.roomhelper.util.validateEditedEntity
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Graphics
@@ -27,6 +31,7 @@ import java.awt.event.KeyEvent
 import javax.swing.JComponent
 import java.io.File
 import javax.swing.AbstractAction
+import javax.swing.Action
 import javax.swing.JLayeredPane
 import javax.swing.JPanel
 import javax.swing.JScrollPane
@@ -65,6 +70,9 @@ class RoomHelperWindow : DialogWrapper(true) {
             history = history,
             window = this,
             onUpdate = {
+                editPanel?.apply {
+                    endCurrentEditing()
+                }
                 entitiesPane?.let {
                     paintUI(it)
                 }
@@ -113,7 +121,7 @@ class RoomHelperWindow : DialogWrapper(true) {
     override fun createCenterPanel(): JComponent? {
         return JSplitPane(JSplitPane.HORIZONTAL_SPLIT).apply {
             leftComponent = entitiesPane()
-            rightComponent = editPanel()
+            rightComponent = editPanel().apply { editPanel = this }
             dividerSize = 5
             dividerLocation = 600
             setUI(object : BasicSplitPaneUI() {
@@ -134,7 +142,7 @@ class RoomHelperWindow : DialogWrapper(true) {
         }
     }
 
-    private fun editPanel(): JComponent {
+    private fun editPanel(): EditPanel {
         return EditPanel(
             onSave = { updatedEntity, otherEntityRelationUpdates ->
                 val newState = history.currentState.map { it.deepCopy() }.toMutableList()
@@ -163,12 +171,19 @@ class RoomHelperWindow : DialogWrapper(true) {
                         }
                     }
                 }
-                history.add(newState)
-                updateUIOnEdit()
+                val validation = validateEditedEntity(
+                    edited = updatedEntity,
+                    other = newState.filter { it.name != updatedEntity.name }
+                )
+                if (validation is ValidationResult.Failure) {
+                    Messages.showErrorDialog(validation.message, "Invalid Save Data")
+                } else {
+                    history.add(newState)
+                    editPanel?.endCurrentEditing()
+                    updateUIOnEdit()
+                }
             },
-        ).apply {
-            editPanel = this
-        }
+        )
     }
 
     private fun entitiesPane(): JComponent {
@@ -253,7 +268,6 @@ class RoomHelperWindow : DialogWrapper(true) {
             changeUndoButton(!history.isFirstState)
         }
         changeSavedStatus(false)
-        editPanel?.endCurrentEditing()
     }
 
     private fun openDatabaseFile(): File {
@@ -289,11 +303,11 @@ class RoomHelperWindow : DialogWrapper(true) {
                 onDeleteRequest = {
                     removeEntity(it.entity)
                     updateUIOnEdit()
+                    editPanel?.endCurrentEditing()
                 },
                 onEditRequest = {
                     editPanel?.changeEntity(history.currentState, it.entity)
                     editPanel?.revalidate()
-                    editPanel?.repaint()
                 },
                 onPositionChanged = {
                     pane.repaint()
@@ -316,25 +330,23 @@ class RoomHelperWindow : DialogWrapper(true) {
         pane.add(JPanel())
 
         history.currentState.filterIsInstance<Parsed.Entity>().forEach { entity ->
-            entity.relations.forEach { relation ->
-                relation.refTable.let { refTable ->
-                    val fromBlock = entityBlocks.find { it.entity.name == refTable } ?: return@let
-                    val toBlock = entityBlocks.find { it.entity.name == entity.name } ?: return@let
+            entity.relations.forEach relations@ { relation ->
+                val fromBlock = entityBlocks.find { it.entity.name == entity.name } ?: return@relations
+                val toBlock = entityBlocks.find { it.entity.name == relation.refTable } ?: return@relations
 
-                    val arrow = RelationshipArrow(
-                        fromBlock = fromBlock,
-                        toBlock = toBlock,
-                        relationType = relation.type
-                    )
-                    pane.add(arrow, JLayeredPane.PALETTE_LAYER)
-                }
+                val arrow = RelationshipArrow(
+                    fromBlock = fromBlock,
+                    toBlock = toBlock,
+                    relationType = relation.type
+                )
+                pane.add(arrow, JLayeredPane.PALETTE_LAYER)
             }
         }
 
         history.currentState.filterIsInstance<Parsed.ManyToMany>().forEach { m2mEntity ->
-            m2mEntity.relations.forEach second@ { relation ->
-                val fromBlock = entityBlocks.find { it.entity.name == m2mEntity.name } ?: return@second
-                val toBlock = entityBlocks.find { it.entity.name == relation.refTable } ?: return@second
+            m2mEntity.relations.forEach relations@ { relation ->
+                val fromBlock = entityBlocks.find { it.entity.name == m2mEntity.name } ?: return@relations
+                val toBlock = entityBlocks.find { it.entity.name == relation.refTable } ?: return@relations
 
                 val arrow = RelationshipArrow(
                     fromBlock = fromBlock,
@@ -374,5 +386,29 @@ class RoomHelperWindow : DialogWrapper(true) {
         entityBlocks.removeIf {
             it.entity == removed
         }
+    }
+
+    override fun getOKAction(): Action {
+        return super.getOKAction().apply {
+            putValue(Action.NAME, "Generate code")
+        }
+    }
+
+    override fun doOKAction() {
+        super.doOKAction()
+    }
+
+    override fun getCancelAction(): Action {
+        return super.getCancelAction().apply {
+            putValue(Action.NAME, "Close")
+        }
+    }
+
+    override fun doCancelAction() {
+        if (!isSaved) {
+            UnsavedCloseRationale(
+                onCloseAgree = { super.doOKAction() },
+            ).show()
+        } else super.doCancelAction()
     }
 }

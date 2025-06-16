@@ -207,8 +207,8 @@ class EditPanel(
     private fun paintFields(panel: JPanel, entity: Parsed) {
         entity.fields
             .filter { field ->
-                if (entity is Parsed.Entity) {
-                    entity.relations.none { relation -> relation.name == field.name }
+                if (entity is Parsed.Entity || entity is Parsed.ManyToMany) {
+                    entity.relations().none { relation -> relation.name == field.name }
                 } else true
             }
             .forEach { field ->

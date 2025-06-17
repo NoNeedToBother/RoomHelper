@@ -3,6 +3,7 @@ package ru.kpfu.itis.paramonov.roomhelper.generator.util.database
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
+import ru.kpfu.itis.paramonov.roomhelper.util.getFieldType
 import kotlin.math.min
 
 fun parseEntities(text: String): List<Parsed> {
@@ -61,7 +62,7 @@ fun parseEntities(text: String): List<Parsed> {
             entities.add(Parsed.Embedded(name, fields))
         }
         else if (isManyToMany) {
-            entities.add(Parsed.ManyToMany(name, fields, relations))//manyToManyRelations))
+            entities.add(Parsed.ManyToMany(name, fields, relations))
         }
         else {
             entities.add(Parsed.Entity(name, fields, relations, indices))
@@ -96,30 +97,4 @@ fun parseRelation(line: String): Relation {
         refTable = refParts[0],
         refColumn = refParts[1],
     )
-}
-
-fun getFieldType(type: String): String {
-    return when (type) {
-        "int" -> "Int"
-        "str" -> "String"
-        "bool" -> "Boolean"
-        "long" -> "Long"
-        "float" -> "Float"
-        "double" -> "Double"
-        "date" -> "Date"
-        else -> type
-    }
-}
-
-fun getDatabaseType(fieldType: String): String {
-    return when (fieldType) {
-        "Int" -> "int"
-        "String" -> "str"
-        "Boolean" -> "bool"
-        "Long" -> "long"
-        "Float" -> "float"
-        "Double" -> "double"
-        "Date" -> "date"
-        else -> fieldType
-    }
 }

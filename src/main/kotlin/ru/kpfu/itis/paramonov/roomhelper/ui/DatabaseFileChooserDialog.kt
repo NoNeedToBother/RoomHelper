@@ -6,7 +6,9 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JButton
 
-class DatabaseFileChooserDialog : DialogWrapper(true) {
+class DatabaseFileChooserDialog(
+    //onNewClicked: () -> Unit,
+) : DialogWrapper(true) {
 
     private var file: String? = null
 
@@ -22,6 +24,11 @@ class DatabaseFileChooserDialog : DialogWrapper(true) {
                 openFileChooser { file ->
                     this@DatabaseFileChooserDialog.file = file
                 }
+            }
+        }
+        val newButton = JButton("New").apply {
+            addActionListener {
+
             }
         }
 

@@ -1,5 +1,5 @@
 package ru.kpfu.itis.paramonov.roomhelper.util
 
-val lineSeparator = System.lineSeparator()
+val lineSeparator: String = System.lineSeparator() ?: "\n"
 
-val tab = "\t"
+const val tab = "\t"

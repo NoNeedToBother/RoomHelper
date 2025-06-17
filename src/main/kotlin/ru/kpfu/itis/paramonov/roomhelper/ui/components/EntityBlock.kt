@@ -3,7 +3,7 @@ package ru.kpfu.itis.paramonov.roomhelper.ui.components
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
-import ru.kpfu.itis.paramonov.roomhelper.generator.util.database.getDatabaseType
+import ru.kpfu.itis.paramonov.roomhelper.util.getDatabaseType
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import java.awt.*
 import java.awt.event.ComponentAdapter

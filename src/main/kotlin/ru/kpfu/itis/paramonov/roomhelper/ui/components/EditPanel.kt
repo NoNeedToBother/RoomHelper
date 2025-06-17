@@ -72,10 +72,10 @@ class EditPanel(
             })
             add(JButton("Save").apply {
                 addActionListener {
-                    _editBuffer?.let {
+                    _editBuffer?.let { buffer ->
                         onSave(
-                            it.deepCopy(),
-                            relationUpdates.map { it.first to it.second.map { it.copy() } }
+                            buffer.deepCopy(),
+                            relationUpdates.map { it.first to it.second.map { relation -> relation.copy() } }
                         )
                     }
                 }

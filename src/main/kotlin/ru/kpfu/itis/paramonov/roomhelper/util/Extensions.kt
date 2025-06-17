@@ -17,14 +17,6 @@ fun Parsed.deepCopy(): Parsed {
     }
 }
 
-fun Parsed.relations(): List<Relation> {
-    return when (this) {
-        is Parsed.Entity -> relations
-        is Parsed.ManyToMany -> relations
-        is Parsed.Embedded -> emptyList()
-    }
-}
-
 fun Parsed.Entity.deepCopy(): Parsed.Entity {
     return copy(
         fields = ArrayList(fields.map { it.copy() }),
@@ -44,6 +36,14 @@ fun Parsed.Embedded.deepCopy(): Parsed.Embedded {
     return copy(
         fields = ArrayList(fields.map { it.copy() }),
     )
+}
+
+fun Parsed.relations(): List<Relation> {
+    return when (this) {
+        is Parsed.Entity -> relations
+        is Parsed.ManyToMany -> relations
+        is Parsed.Embedded -> emptyList()
+    }
 }
 
 // needed to check on field change whether buffer field and other entity overlap in everything other than

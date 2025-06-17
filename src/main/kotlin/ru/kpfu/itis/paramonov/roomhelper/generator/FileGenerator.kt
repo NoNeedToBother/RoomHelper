@@ -1,6 +1,6 @@
 package ru.kpfu.itis.paramonov.roomhelper.generator
 
-import ru.kpfu.itis.paramonov.roomhelper.generator.util.database.getDatabaseType
+import ru.kpfu.itis.paramonov.roomhelper.util.getDatabaseType
 import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
@@ -9,7 +9,7 @@ import java.io.File
 
 class FileGenerator {
     fun generate(file: File, entities: List<Parsed>) {
-        val content = entities.joinToString("$lineSeparator") { entity ->
+        val content = entities.joinToString(lineSeparator) { entity ->
             when (entity) {
                 is Parsed.Entity -> generateEntityBlock(entity)
                 is Parsed.Embedded -> generateEmbeddedBlock(entity)
@@ -42,7 +42,7 @@ class FileGenerator {
         """.trimMargin()
             .lines()
             .filter { it.isNotEmpty() }
-            .joinToString(separator = "$lineSeparator")
+            .joinToString(separator = lineSeparator)
     }
 
     private fun generateEmbeddedBlock(embedded: Parsed.Embedded): String {

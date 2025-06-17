@@ -35,7 +35,6 @@ class DatabaseGenerator(
             }
             val outputFile = File(outputDir, "${entity.name}.kt")
             outputFile.writeText(kotlinCode)
-            println("Generated: ${outputFile.path}")
         }
 
         val regularEntities: MutableList<Parsed.Entity> = mutableListOf()

@@ -54,7 +54,7 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
                 |${uniqueIndices.joinToString(separator = ",$lineSeparator").prependIndent(tab)}
                 |${indices.joinToString(separator = ",$lineSeparator").prependIndent(tab)}
                 |],
-            """.trimMargin().lines().filter { it.isNotBlank() }.joinToString("$lineSeparator").prependIndent(tab) else ""
+            """.trimMargin().lines().filter { it.isNotBlank() }.joinToString(lineSeparator).prependIndent(tab) else ""
     }
         |)
         """.trimMargin())
@@ -72,20 +72,20 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
         imports.add("import java.util.Date")
     }
 
-    val fieldsCode = entity.fields.joinToString("$lineSeparator") { field ->
+    val fieldsCode = entity.fields.joinToString(lineSeparator) { field ->
         val annotations = mutableListOf<String>()
         if (field.isPrimaryKey) annotations.add("@PrimaryKey")
         if (field.isEmbedded) annotations.add("@Embedded")
         val nullable = if (!field.isNotNull && !field.isPrimaryKey) "?" else ""
-        """${annotations.joinToString("$lineSeparator")}
+        """${annotations.joinToString(lineSeparator)}
            |val ${field.name}: ${field.type}$nullable,
         """.trimMargin()
     }
 
     return """
-        |${imports.joinToString(separator = "$lineSeparator")}
+        |${imports.joinToString(separator = lineSeparator)}
         |
-        |${entityAnnotation.lines().filter { it.isNotBlank() }.joinToString("$lineSeparator") }
+        |${entityAnnotation.lines().filter { it.isNotBlank() }.joinToString(lineSeparator) }
         |data class ${entity.name}(
         |${fieldsCode.prependIndent(tab)}
         |)
@@ -93,7 +93,7 @@ fun generateRoomEntity(entity: Parsed.Entity): String {
 }
 
 fun generateRoomEmbedded(entity: Parsed.Embedded): String {
-    val fieldsCode = entity.fields.joinToString("$lineSeparator") { field ->
+    val fieldsCode = entity.fields.joinToString(lineSeparator) { field ->
         val nullable = if (!field.isNotNull) "?" else ""
         "val ${field.name}: ${field.type}$nullable"
     }

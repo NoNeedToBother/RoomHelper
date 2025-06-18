@@ -102,3 +102,29 @@ class UnsavedCloseRationale(
         super.doOKAction()
     }
 }
+
+class NewFileSaveDialog(
+    private val onFileNameSubmitted: (String) -> Unit
+) : DialogWrapper(false) {
+
+    private var fileName = ""
+
+    init {
+        init()
+    }
+
+    override fun createCenterPanel(): JComponent? {
+        return JPanel().apply {
+            add(JTextField().apply {
+                addTextChangedListener { fileName ->
+                    this@NewFileSaveDialog.fileName = fileName
+                }
+            })
+        }
+    }
+
+    override fun doOKAction() {
+        onFileNameSubmitted(fileName)
+        super.doOKAction()
+    }
+}

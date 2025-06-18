@@ -4,9 +4,11 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.ui.Messages
 import javax.swing.JComponent
+import javax.swing.JFileChooser
 import javax.swing.JTextField
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import javax.swing.filechooser.FileNameExtensionFilter
 
 fun showErrorMessage(e: Throwable) {
     Messages.showErrorDialog(
@@ -33,6 +35,32 @@ fun openFileChooser(
             )
             openFileChooser(onFileChosen)
         }
+    }
+}
+
+fun openFileSaver(
+    onFileChosen: (String) -> Unit,
+) {
+    val chooser = project?.projectFile?.path?.let { JFileChooser(it) } ?: JFileChooser()
+    chooser.apply {
+        dialogTitle = "Enter New Configuration File"
+        fileFilter = FileNameExtensionFilter("Configuration file", "rh")
+    }
+    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+        onFileChosen(chooser.selectedFile.path)
+    }
+}
+
+fun openGenerationDestination(
+    onDirChosen: (String) -> Unit
+) {
+    val descriptor = FileChooserDescriptor(
+        false, true, false, false, false, false
+    )
+        .withTitle("Choose Code Generation Destination")
+
+    FileChooser.chooseFile(descriptor, null, null)?.let { dir ->
+        onDirChosen(dir.path)
     }
 }
 

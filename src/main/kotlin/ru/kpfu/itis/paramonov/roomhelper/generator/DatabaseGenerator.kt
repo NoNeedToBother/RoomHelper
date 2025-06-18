@@ -24,7 +24,11 @@ class DatabaseGenerator(
             .replaceFirstChar { it.uppercase() }
             .plus("Database")
 
-        if (!outputDir.exists()) outputDir.mkdir()
+        var dir = File(outputDir, "generated")
+        if (!dir.exists()) dir.mkdir()
+        else {
+            dir = File(dir, "roomhelper")
+        }
 
         val entities = parseEntities(inputFile.readText())
         entities.forEach { entity ->
@@ -33,29 +37,29 @@ class DatabaseGenerator(
                 is Parsed.Embedded -> generateRoomEmbedded(entity)
                 is Parsed.ManyToMany -> generateManyToManyEntity(entity)
             }
-            val outputFile = File(outputDir, "${entity.name}.kt")
+            val outputFile = File(dir, "${entity.name}.kt")
             outputFile.writeText(kotlinCode)
         }
 
         val regularEntities: MutableList<Parsed.Entity> = mutableListOf()
         entities.forEach { if (it is Parsed.Entity) regularEntities.add(it) }
         regularEntities.forEach { entity ->
-            File(outputDir, "${entity.name.replaceFirstChar { it.uppercase() }}Dao.kt")
+            File(dir, "${entity.name.replaceFirstChar { it.uppercase() }}Dao.kt")
                 .writeText(generateDao(entity.name))
         }
 
-        File(outputDir, "${databaseName}.kt")
+        File(dir, "${databaseName}.kt")
             .writeText(generateDatabase(regularEntities, databaseName))
 
         val hasDateFields = regularEntities.any { entity ->
             entity.fields.any { it.type == "Date" }
         }
         if (hasDateFields) {
-            File(outputDir, "DateConverter.kt").writeText(generateDateConverter())
+            File(dir, "DateConverter.kt").writeText(generateDateConverter())
         }
 
         generateOneToOneRelationshipClasses(regularEntities).forEach { file ->
-            File(outputDir, "${file.fileName}.kt")
+            File(dir, "${file.fileName}.kt")
                 .writeText("""
                     |import androidx.room.Embedded
                     |import androidx.room.Relation
@@ -66,7 +70,7 @@ class DatabaseGenerator(
         }
 
         generateManyToOneRelationshipClasses(regularEntities).forEach { file ->
-            File(outputDir, "${file.fileName}.kt")
+            File(dir, "${file.fileName}.kt")
                 .writeText("""
                     |import androidx.room.Embedded
                     |import androidx.room.Relation
@@ -83,7 +87,7 @@ class DatabaseGenerator(
         generateManyToManyRelationshipClasses(
             entities = manyToManyEntities,
         ).forEach { file ->
-            File(outputDir, "${file.fileName}.kt")
+            File(dir, "${file.fileName}.kt")
                 .writeText("""
                     |import androidx.room.Embedded
                     |import androidx.room.Relation

@@ -5,6 +5,7 @@ import ru.kpfu.itis.paramonov.roomhelper.model.Field
 import ru.kpfu.itis.paramonov.roomhelper.model.Parsed
 import ru.kpfu.itis.paramonov.roomhelper.model.Relation
 import ru.kpfu.itis.paramonov.roomhelper.util.lineSeparator
+import ru.kpfu.itis.paramonov.roomhelper.util.tab
 import java.io.File
 
 class FileGenerator {
@@ -29,15 +30,15 @@ class FileGenerator {
 
         return """
             |entity ${entity.name}:
-            |    fields:
-            |        $fields
+            |${tab}fields:
+            |${tab}${tab}$fields
             |${if (relations.isNotBlank()) 
-                """|    relations:
-                   |        $relations""".trimMargin() else ""
+                """|${tab}relations:
+                   |${tab}${tab}$relations""".trimMargin() else ""
             }
             |${if (indices.isNotBlank())
-                """|    indices:
-                   |        $indices""".trimMargin() else ""
+                """|${tab}indices:
+                   |${tab}${tab}$indices""".trimMargin() else ""
             }
         """.trimMargin()
             .lines()
@@ -49,8 +50,8 @@ class FileGenerator {
         val fields = embedded.fields.joinToString("$lineSeparator\t\t\t") { generateFieldLine(it) }
         return """
             |entity embed ${embedded.name}:
-            |    fields:
-            |        $fields
+            |${tab}fields:
+            |${tab}${tab}$fields
         """.trimMargin()
     }
 
@@ -61,8 +62,8 @@ class FileGenerator {
 
         return """
             |entity m2m ${m2m.name}:
-            |    relations:
-            |        $relations
+            |${tab}relations:
+            |${tab}${tab}$relations
         """.trimMargin()
     }
 

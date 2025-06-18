@@ -1,5 +1,7 @@
 package ru.kpfu.itis.paramonov.roomhelper.util
 
+import com.intellij.openapi.project.ProjectManager
+
 fun getFieldType(type: String): String {
     return when (type) {
         "int" -> "Int"
@@ -25,3 +27,5 @@ fun getDatabaseType(fieldType: String): String {
         else -> fieldType
     }
 }
+
+val project get() = ProjectManager.getInstance().openProjects.firstOrNull()

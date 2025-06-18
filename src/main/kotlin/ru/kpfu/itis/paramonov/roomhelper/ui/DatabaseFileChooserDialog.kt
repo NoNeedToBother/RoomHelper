@@ -6,11 +6,9 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JButton
 
-class DatabaseFileChooserDialog(
-    //onNewClicked: () -> Unit,
-) : DialogWrapper(true) {
+class DatabaseFileChooserDialog : DialogWrapper(true) {
 
-    private var file: String? = null
+    private var result: FileOpenResult = FileOpenResult.NoFile
 
     init {
         title = "Choose .rh File"
@@ -22,21 +20,29 @@ class DatabaseFileChooserDialog(
         val selectButton = JButton("Choose file").apply {
             addActionListener {
                 openFileChooser { file ->
-                    this@DatabaseFileChooserDialog.file = file
+                    this@DatabaseFileChooserDialog.result = FileOpenResult.Existing(file)
                 }
             }
         }
         val newButton = JButton("New").apply {
             addActionListener {
-
+                this@DatabaseFileChooserDialog.result = FileOpenResult.New
+                doOKAction()
             }
         }
 
         panel.add(selectButton)
+        panel.add(newButton)
         return panel
     }
 
-    fun showAndGetResult(): String? {
-        return if (showAndGet()) file else null
+    fun showAndGetResult(): FileOpenResult {
+        return if (showAndGet()) result else FileOpenResult.NoFile
     }
+}
+
+sealed interface FileOpenResult {
+    object New : FileOpenResult
+    object NoFile : FileOpenResult
+    data class Existing(val file: String) : FileOpenResult
 }

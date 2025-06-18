@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import ru.kpfu.itis.paramonov.roomhelper.state.DatabaseFilePersistentState
 import ru.kpfu.itis.paramonov.roomhelper.ui.DatabaseFileChooserDialog
+import ru.kpfu.itis.paramonov.roomhelper.ui.FileOpenResult
 import ru.kpfu.itis.paramonov.roomhelper.ui.RoomHelperWindow
 
 class HandleStartUpAction: AnAction() {
@@ -16,14 +17,19 @@ class HandleStartUpAction: AnAction() {
             roomHelperWindow.show()
         } else {
             val dialog = DatabaseFileChooserDialog()
-            val resultFile = dialog.showAndGetResult()
+            val result = dialog.showAndGetResult()
 
-            if (resultFile != null) {
-                databaseFileState.state.value = resultFile
+            when(result) {
+                is FileOpenResult.Existing -> {
+                    databaseFileState.state.value = result.file
+                    RoomHelperWindow().show()
+                }
+                is FileOpenResult.New -> {
+                    databaseFileState.state.value = null
+                    RoomHelperWindow(isNewFile = true).show()
+                }
+                is FileOpenResult.NoFile -> {}
             }
-
-            val roomHelperWindow = RoomHelperWindow()
-            roomHelperWindow.show()
         }
     }
 }

@@ -79,7 +79,7 @@ class EntityBlock(
         addMouseListeners()
     }
 
-    val connectionPoints = mutableMapOf(
+    private val connectionPoints = mutableMapOf(
         ConnectionSide.START to Point(0, height / 2),
         ConnectionSide.END to Point(width, height / 2),
     )

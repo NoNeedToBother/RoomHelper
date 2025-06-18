@@ -1,9 +1,11 @@
 package ru.kpfu.itis.paramonov.roomhelper.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
+import ru.kpfu.itis.paramonov.roomhelper.generator.DatabaseGenerator
 import ru.kpfu.itis.paramonov.roomhelper.generator.FileGenerator
 import ru.kpfu.itis.paramonov.roomhelper.generator.util.database.parseEntities
 import ru.kpfu.itis.paramonov.roomhelper.ui.model.DatabaseStateHistory
@@ -17,6 +19,8 @@ import ru.kpfu.itis.paramonov.roomhelper.ui.components.MenuBar
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.RelationshipArrow
 import ru.kpfu.itis.paramonov.roomhelper.ui.components.UnsavedCloseRationale
 import ru.kpfu.itis.paramonov.roomhelper.util.deepCopy
+import ru.kpfu.itis.paramonov.roomhelper.util.openFileSaver
+import ru.kpfu.itis.paramonov.roomhelper.util.openGenerationDestination
 import ru.kpfu.itis.paramonov.roomhelper.util.relations
 import ru.kpfu.itis.paramonov.roomhelper.util.showErrorMessage
 import ru.kpfu.itis.paramonov.roomhelper.util.validateEditedEntity
@@ -42,7 +46,9 @@ import javax.swing.plaf.basic.BasicSplitPaneDivider
 import javax.swing.plaf.basic.BasicSplitPaneUI
 import kotlin.random.Random
 
-class RoomHelperWindow : DialogWrapper(true) {
+class RoomHelperWindow(
+    private var isNewFile: Boolean = false
+) : DialogWrapper(true) {
 
     private val entityBlocks = mutableListOf<EntityBlock>()
     private val history = DatabaseStateHistory()
@@ -52,7 +58,6 @@ class RoomHelperWindow : DialogWrapper(true) {
     private var menuBar: MenuBar? = null
     private var editPanel: EditPanel? = null
 
-    private var isNewFile = false
     private var isSaved = true
 
     init {
@@ -63,6 +68,8 @@ class RoomHelperWindow : DialogWrapper(true) {
 
         isResizable = true
         isModal = false
+
+        if (isNewFile) changeTitle(null)
     }
 
     override fun createNorthPanel(): JComponent? {
@@ -188,9 +195,11 @@ class RoomHelperWindow : DialogWrapper(true) {
 
     private fun entitiesPane(): JComponent {
         try {
-            openDatabaseFile().let { file ->
-                changeTitle(file.name)
-                history.add(parseEntities(file.readText()))
+            if (!isNewFile) {
+                openDatabaseFile().let { file ->
+                    changeTitle(file.name)
+                    history.add(parseEntities(file.readText()))
+                }
             }
         } catch (e: Throwable) {
             showErrorMessage(e)
@@ -284,11 +293,28 @@ class RoomHelperWindow : DialogWrapper(true) {
 
     private fun save() {
         try {
-            FileGenerator().generate(
-                file = openDatabaseFile(),
-                entities = history.currentState
-            )
-            changeSavedStatus(true)
+            if (isNewFile) {
+                openFileSaver(
+                    onFileChosen = {
+                        DatabaseFilePersistentState.getInstance().state.value = it
+                        val file = File(it)
+                        if (!file.exists()) file.createNewFile()
+                        FileGenerator().generate(
+                            file = openDatabaseFile(),
+                            entities = history.currentState
+                        )
+                        changeTitle(file.name)
+                        changeSavedStatus(true)
+                    }
+                )
+            }
+            else {
+                FileGenerator().generate(
+                    file = openDatabaseFile(),
+                    entities = history.currentState
+                )
+                changeSavedStatus(true)
+            }
         } catch (e: Throwable) {
             showErrorMessage(e)
         }
@@ -395,7 +421,27 @@ class RoomHelperWindow : DialogWrapper(true) {
     }
 
     override fun doOKAction() {
-        super.doOKAction()
+        if (DatabaseFilePersistentState.getInstance().state.value == null) {
+            Messages.showErrorDialog(
+                "Save new database before generating",
+                "Generation Fail"
+            )
+            return
+        }
+        openGenerationDestination { dir ->
+            try {
+                DatabaseGenerator(
+                    inputFile = openDatabaseFile(),
+                    outputDir = File(dir),
+                ).generate()
+                Messages.showMessageDialog(
+                    "Database files were successfully generated", "Success",
+                    AllIcons.General.SuccessDialog
+                )
+            } catch (e: Throwable) {
+                showErrorMessage(e)
+            }
+        }
     }
 
     override fun getCancelAction(): Action {
